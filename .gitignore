@@ -1,0 +1,8 @@
+.env
+downloads/
+*.log
+music_data.json
+music_data.json.tmp
+node_modules/
+npm-debug.log*
+.DS_Store

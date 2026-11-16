@@ -8,7 +8,7 @@ Telegram music bot built with **Telegraf** + **Telekaf Rich Messages** + **Expre
 |---------|-------------|
 | `/start` | Premium welcome card (telekaf rich message) |
 | `/menu` | Commands page |
-| `/play` | Add & play music (owner only) |
+| `/play <query|url>` | Search YouTube via yt-dlp, download MP3, and send audio (owner only) |
 | `/pause` | Pause current track (owner only) |
 | `/resume` | Resume playback (owner only) |
 | `/skip` | Skip to next track (owner only) |
@@ -40,7 +40,43 @@ npm start
 
 1. Connect this repo to Render
 2. Add env vars: `BOT_TOKEN`, `OWNER_ID`, `BOT_USERNAME`, `BRAND_NAME`, `PUBLIC_URL`, `DEV_TAG`
-3. Deploy — bot starts polling automatically
+3. Set **Build Command**: `apt-get update && apt-get install -y ffmpeg && pip install yt-dlp`
+4. Deploy — bot starts polling automatically
+
+## System Dependencies
+
+The bot requires `ffmpeg` and `yt-dlp` to be installed on the host:
+
+```bash
+# Debian/Ubuntu
+apt-get install -y ffmpeg
+pip install yt-dlp
+
+# Or via npm
+npm install -g yt-dlp
+```
+
+## Inline Buttons
+
+`/start` shows exactly 3 inline buttons:
+
+| Row | Buttons |
+|-----|---------|
+| 1 | 📋 Menu · ➕ Add Me to Channel |
+| 2 | 👤 Contact Owner |
+
+- **Menu** — opens the commands page (callback)
+- **Add Me to Channel** — deep link `?startchannel=new` to add bot to a channel
+- **Contact Owner** — direct chat with the bot owner via `tg://user?id=OWNER_ID`
+
+## Audio Playback
+
+`/play` accepts:
+- A search query (e.g. `/play Nazra Ke Teer Vikram Sarkar`) — searches YouTube via yt-dlp
+- A YouTube/SoundCloud/etc. URL — downloads directly
+- A reply to an audio file — reuses the file
+
+Downloaded MP3s are stored in `downloads/` and sent via Telegram `sendAudio`.
 
 ## Inline Buttons
 

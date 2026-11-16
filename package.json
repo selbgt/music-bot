@@ -13,5 +13,13 @@
     "@icanseeuanywhere/telekaf": "^4.17.1",
     "express": "^4.19.2",
     "telegraf": "^4.16.3"
+  },
+  "systemDependencies": {
+    "ffmpeg": "required for audio conversion",
+    "yt-dlp": "required for YouTube/SoundCloud audio search & download"
+  },
+  "render": {
+    "buildCommand": "apt-get update && apt-get install -y ffmpeg && pip install yt-dlp",
+    "startCommand": "npm start"
   }
 }

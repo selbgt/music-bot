@@ -1,18 +1,23 @@
 #!/usr/bin/env node
 /**
  * ═════════════════════════════════════════════════════════════════
- *  MUSIC BOT — Telekaf HTML View Edition
+ *  MUSIC BOT — Telekaf HTML View Edition (with yt-dlp audio)
  *  Telegraf + Telekaf Rich Messages + Express HTML Music Player
  *
- *  • /start — Welcome card with telekaf rich message + inline buttons
+ *  • /start — Welcome card + inline buttons (Menu, Add to Channel, Contact Owner)
  *  • /menu — Commands page
- *  • /play — Play music with HTML view
- *  • /pause /resume — Pause/resume playback
- *  • /skip — Skip to next track
+ *  • /play <query|url> — Search yt-dlp and send audio (owner only)
+ *  • /pause /resume — Pause/resume playback (owner only)
+ *  • /skip — Skip to next track (owner only)
  *  • /queue — Show current queue
  *  • /current — Show currently playing track
- *  • /nowplaying — Beautiful telekaf card with audio player
+ *  • /nowplaying — Rich music player card with HTML player link
+ *  • /verify_join — Verify join instructions
  *  • Built-in keep-alive HTTP server for Render
+ *
+ *  Deploy deps (Render build command or Dockerfile):
+ *    apt-get install -y ffmpeg
+ *    npm install -g yt-dlp   (or pip install yt-dlp)
  *
  *  Setup:
  *    1. npm install
@@ -25,6 +30,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execSync, execFile } = require('child_process');
 const express = require('express');
 const { Telegraf, RichMessage } = require('@icanseeuanywhere/telekaf');
 
@@ -53,12 +59,15 @@ const BOT_USERNAME = process.env.BOT_USERNAME || '';
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC_URL = (process.env.PUBLIC_URL || 'https://music-bot.onrender.com').replace(/\/+$/, '');
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, 'music_data.json');
+const DOWNLOAD_DIR = process.env.DOWNLOAD_DIR || path.join(__dirname, 'downloads');
 
 if (!BOT_TOKEN) { console.error('❌ Missing BOT_TOKEN'); process.exit(1); }
 if (!OWNER_ID) { console.error('❌ Missing OWNER_ID'); process.exit(1); }
 
+fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
+
 const START_TS = Date.now();
-const DIVIDER = '⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯';
+const DIVIDER = '⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯';
 
 // Inline keyboard: 3 buttons — Menu + Add Me to Channel on top row, Contact Owner below
 const INLINE_KEYBOARD = {
@@ -110,6 +119,49 @@ function getRuntime() {
   const hours = Math.floor((d % 86400) / 3600);
   const mins = Math.floor((d % 3600) / 60);
   return `${days}d ${hours}h ${mins}m`;
+}
+
+// ───────────────── yt-dlp helpers ─────────────────
+function ytdlSearch(query) {
+  try {
+    const out = execSync(
+      `yt-dlp --flat-playlist --print "%(title)s||%(duration_string)s||%(webpage_url)s" --max-downloads 1 "ytsearch1:${query}"`,
+      { encoding: 'utf8', timeout: 30000 }
+    ).trim();
+    const [title, duration, url] = out.split('||');
+    return { title: title || 'Unknown', duration: duration || 'Unknown', url: url || '' };
+  } catch (e) {
+    log('warn', 'yt-dlp search failed:', e && e.stderr ? e.stderr.toString().slice(0, 200) : e.message);
+    return null;
+  }
+}
+
+function ytdlDownload(url) {
+  const outFile = path.join(DOWNLOAD_DIR, `%(title)s.%(ext)s`);
+  try {
+    execSync(
+      `yt-dlp -x --audio-format mp3 --audio-quality 0 --output "${outFile}" --print "%(title)s||%(duration_string)s||%(filename)s" "${url}"`,
+      { encoding: 'utf8', timeout: 120000 }
+    );
+    // yt-dlp prints title||duration||filename on last line
+    const out = execSync(
+      `yt-dlp -x --audio-format mp3 --audio-quality 0 --output "${outFile}" --print "%(title)s||%(duration_string)s||%(filename)s" "${url}"`,
+      { encoding: 'utf8', timeout: 120000 }
+    ).trim();
+    const [title, duration, filename] = out.split('||');
+    return { title: title || 'Unknown', duration: duration || 'Unknown', file: filename || '' };
+  } catch (e) {
+    log('warn', 'yt-dlp download failed:', e && e.stderr ? e.stderr.toString().slice(0, 200) : e.message);
+    return null;
+  }
+}
+
+function formatDuration(secOrStr) {
+  if (typeof secOrStr === 'string' && secOrStr.includes(':')) return secOrStr;
+  const s = Number(secOrStr) || 0;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return `${m}:${rem.toString().padStart(2, '0')}`;
 }
 
 // ───────────────── Music Data ─────────────────
@@ -227,7 +279,7 @@ app.get('/player', (req, res) => {
     <div class="status">Server: <span class="online">● ONLINE</span> | Uptime: ${getRuntime()}</div>
     <div class="track-card">
       <div class="track-info">
-        ${current ? `<h2>🎧 ${htmlEsc(current.title)}</h2><p>By: ${htmlEsc(current.artist)}</p><p>Duration: ${current.duration || 'Unknown'}</p>` : '<h2>No track playing</h2><p>Use /play to add music</p>'}
+        ${current ? `<h2>🎧 ${htmlEsc(current.title)}</h2><p>By: ${htmlEsc(current.artist || 'Unknown')}</p><p>Duration: ${current.duration || 'Unknown'}</p>` : '<h2>No track playing</h2><p>Use /play to add music</p>'}
       </div>
       <div class="controls">
         ${playing ? '<button class="pause" onclick="fetch(\'/pause\')">⏸ Pause</button>' : '<button onclick="fetch(\'/resume\')">▶ Resume</button>'}
@@ -239,7 +291,7 @@ app.get('/player', (req, res) => {
       ${queue.map((t, i) => `
         <div class="queue-item ${i === music.current.index ? 'active' : ''}">
           <span>${i + 1}. ${htmlEsc(t.title)}</span>
-          <span style="font-size:0.8rem;color:#aaa">${htmlEsc(t.artist)}</span>
+          <span style="font-size:0.8rem;color:#aaa">${htmlEsc(t.artist || 'Unknown')}</span>
         </div>
       `).join('') || '<p style="color:#999">Queue is empty</p>'}
     </div>
@@ -320,7 +372,7 @@ bot.start(async (ctx) => {
     .table(
       [
         ['Command', 'What it does'],
-        ['/play', 'Play music (reply with audio or send URL)'],
+        ['/play', 'Play music (search YouTube or send URL)'],
         ['/pause', 'Pause current track'],
         ['/resume', 'Resume playback'],
         ['/skip', 'Skip to next track'],
@@ -456,7 +508,7 @@ bot.action('menu', async (ctx) => {
   }
 });
 
-// /play — play music
+// /play — search yt-dlp and send audio
 bot.command('play', async (ctx) => {
   if (ctx.from.id !== OWNER_ID) {
     await ctx.reply('⚠️ Only the owner can add music.');
@@ -464,34 +516,64 @@ bot.command('play', async (ctx) => {
   }
   const text = ctx.message.text;
   const parts = text.split(/\s+/).slice(1);
-  if (parts.length === 0 && !ctx.message.reply_to_message) {
+  const query = parts.join(' ').trim();
+
+  if (!query && !ctx.message.reply_to_message) {
     const built = new RH()
       .heading(2, '⚠️ USAGE')
-      .paragraph(`Send: <code>/play Song Title — Artist — URL</code>\nOr reply to an audio file with <code>/play</code>`);
-    const fallback = `⚠️ USAGE\n\nSend: /play Song Title — Artist — URL\nOr reply to an audio file with /play`;
+      .paragraph(`Send: <code>/play Song Name</code> or <code>/play https://youtube.com/...</code>\nOr reply to an audio file with <code>/play</code>`);
+    const fallback = `⚠️ USAGE\n\nSend: /play Song Name or /play https://youtube.com/...\nOr reply to an audio file with /play`;
     await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     return;
   }
 
-  let title = 'Unknown', artist = 'Unknown', url = '';
+  let title = 'Unknown', artist = 'Unknown', url = '', duration = 'Unknown', filePath = '';
+
   if (ctx.message.reply_to_message && ctx.message.reply_to_message.audio) {
     const audio = ctx.message.reply_to_message.audio;
     title = audio.title || audio.file_name || 'Unknown';
     artist = audio.performer || 'Unknown';
-    url = `https://api.telegram.org/file/bot${BOT_TOKEN}/`; // placeholder
-  } else {
-    const joined = parts.join(' ');
-    const segs = joined.split('—').map(s => s.trim());
-    if (segs.length >= 2) {
-      title = segs[0];
-      artist = segs[1];
-      url = segs[2] || '';
-    } else {
-      title = joined;
+    duration = formatDuration(audio.duration);
+    // file_id for replaying later
+    url = `tg://audio/${audio.file_id}`;
+    filePath = `tg://audio/${audio.file_id}`;
+  } else if (query.startsWith('http://') || query.startsWith('https://')) {
+    // Direct URL — download via yt-dlp
+    const status = await ctx.reply('⬇️ Downloading audio…');
+    const result = ytdlDownload(query);
+    if (!result) {
+      await ctx.editMessageText('❌ Failed to download audio. Check the URL.');
+      return;
     }
+    title = result.title;
+    duration = result.duration;
+    url = query;
+    filePath = result.file || '';
+    await ctx.deleteMessage().catch(() => {});
+  } else {
+    // Search query
+    const status = await ctx.reply('🔍 Searching…');
+    const result = ytdlSearch(query);
+    if (!result) {
+      await ctx.editMessageText('❌ No results found.');
+      return;
+    }
+    title = result.title;
+    duration = result.duration;
+    url = result.url;
+    // Download the found URL
+    const status2 = await ctx.reply('⬇️ Downloading audio…');
+    const downloaded = ytdlDownload(url);
+    if (downloaded) {
+      title = downloaded.title;
+      duration = downloaded.duration;
+      filePath = downloaded.file || '';
+    }
+    await ctx.deleteMessage().catch(() => {});
+    await ctx.deleteMessage(status2.message_id).catch(() => {});
   }
 
-  music.queue.push({ title, artist, url, duration: 'Unknown', addedBy: ctx.from.first_name || 'User' });
+  music.queue.push({ title, artist, url, duration, filePath, addedBy: ctx.from.first_name || 'User' });
   if (music.current.index === -1) {
     music.current.index = 0;
     music.current.playing = true;
@@ -502,11 +584,12 @@ bot.command('play', async (ctx) => {
   const built = new RH()
     .heading(2, '✅ TRACK ADDED')
     .paragraph(`<b>${htmlEsc(title)}</b> by <b>${htmlEsc(artist)}</b>`)
+    .paragraph(`Duration: <code>${duration}</code>`)
     .paragraph(`Position in queue: <code>${music.queue.length}</code>`);
   const fallback =
     `<b>『 ${FANCY(BRAND_NAME.toUpperCase(), 'bold')} 』</b>\n${DIVIDER}\n\n` +
     `✅ <b>TRACK ADDED</b>\n\n` +
-    `${title} by ${artist}\nPosition: ${music.queue.length}`;
+    `${title} by ${artist}\nDuration: ${duration}\nPosition: ${music.queue.length}`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
 
@@ -544,7 +627,7 @@ bot.command('queue', async (ctx) => {
     return;
   }
   const lines = music.queue.map((t, i) =>
-    `${i === music.current.index ? '🎧' : '  '} ${i + 1}. ${htmlEsc(t.title)} — ${htmlEsc(t.artist)}`
+    `${i === music.current.index ? '🎧' : '  '} ${i + 1}. ${htmlEsc(t.title)} — ${htmlEsc(t.artist || 'Unknown')} (${t.duration})`
   ).join('\n');
   await ctx.reply(`📋 <b>QUEUE</b>\n\n${lines}`, { parse_mode: 'HTML' });
 });
@@ -556,7 +639,7 @@ bot.command('current', async (ctx) => {
     return;
   }
   const t = music.current.track;
-  await ctx.reply(`🎧 <b>NOW PLAYING</b>\n\n${t.title}\nBy: ${t.artist}\nStatus: ${music.current.playing ? '▶ Playing' : '⏸ Paused'}`, { parse_mode: 'HTML' });
+  await ctx.reply(`🎧 <b>NOW PLAYING</b>\n\n${t.title}\nBy: ${t.artist || 'Unknown'}\nDuration: ${t.duration}\nStatus: ${music.current.playing ? '▶ Playing' : '⏸ Paused'}`, { parse_mode: 'HTML' });
 });
 
 // /nowplaying — rich card with HTML player link
@@ -571,19 +654,20 @@ bot.command('nowplaying', async (ctx) => {
   const built = new RH()
     .heading(2, '🎧 NOW PLAYING')
     .paragraph(`<b>${htmlEsc(t.title)}</b>`)
-    .paragraph(`By: <b>${htmlEsc(t.artist)}</b>`)
+    .paragraph(`By: <b>${htmlEsc(t.artist || 'Unknown')}</b>`)
+    .paragraph(`Duration: ${t.duration}`)
     .paragraph(`Status: ${music.current.playing ? '▶ Playing' : '⏸ Paused'}`)
     .divider()
     .paragraph(`🌐 <a href="${PUBLIC_URL}/player">Open HTML Player</a>`);
   const fallback =
     `<b>『 ${FANCY(BRAND_NAME.toUpperCase(), 'bold')} 』</b>\n${DIVIDER}\n\n` +
     `🎧 <b>NOW PLAYING</b>\n\n` +
-    `${t.title}\nBy: ${t.artist}\nStatus: ${music.current.playing ? '▶ Playing' : '⏸ Paused'}\n\n` +
+    `${t.title}\nBy: ${t.artist || 'Unknown'}\nDuration: ${t.duration}\nStatus: ${music.current.playing ? '▶ Playing' : '⏸ Paused'}\n\n` +
     `🌐 HTML Player: ${PUBLIC_URL}/player`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
 
-// /verify_join command (listed in menu)
+// /verify_join command
 bot.command('verify_join', async (ctx) => {
   const built = new RH()
     .heading(2, '✅ VERIFY JOIN')
