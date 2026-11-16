@@ -4,7 +4,8 @@
  *  MUSIC BOT — Telekaf HTML View Edition
  *  Telegraf + Telekaf Rich Messages + Express HTML Music Player
  *
- *  • /start — Welcome card with telekaf rich message
+ *  • /start — Welcome card with telekaf rich message + inline buttons
+ *  • /menu — Commands page
  *  • /play — Play music with HTML view
  *  • /pause /resume — Pause/resume playback
  *  • /skip — Skip to next track
@@ -37,7 +38,7 @@ const RH = RichMessage.RichHTMLBuilder;
     if (!line || line.startsWith('#') || !line.includes('=')) continue;
     const idx = line.indexOf('=');
     const key = line.slice(0, idx).trim();
-    const value = line.slice(idx + 1).trim().replace(/^["']|["']$/g, '');
+    const value = line.slice(idx + 1).trim().replace(/^[\"']|[\"']$/g, '');
     if (!(key in process.env)) process.env[key] = value;
   }
 })();
@@ -48,6 +49,7 @@ const OWNER_ID = Number(process.env.OWNER_ID || 0);
 const BRAND_NAME = process.env.BRAND_NAME || 'MUSIC BOT';
 const BRAND_LINK = process.env.BRAND_LINK || '';
 const DEV_TAG = process.env.DEV_TAG || '@DEV_AI_REMASTERED';
+const BOT_USERNAME = process.env.BOT_USERNAME || '';
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC_URL = (process.env.PUBLIC_URL || 'https://music-bot.onrender.com').replace(/\/+$/, '');
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, 'music_data.json');
@@ -56,7 +58,20 @@ if (!BOT_TOKEN) { console.error('❌ Missing BOT_TOKEN'); process.exit(1); }
 if (!OWNER_ID) { console.error('❌ Missing OWNER_ID'); process.exit(1); }
 
 const START_TS = Date.now();
-const DIVIDER = '⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯';
+const DIVIDER = '⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯';
+
+// Inline keyboard: 3 buttons — Menu + Add Me to Channel on top row, Contact Owner below
+const INLINE_KEYBOARD = {
+  inline_keyboard: [
+    [
+      { text: '📋 Menu', callback_data: 'menu' },
+      { text: '➕ Add Me to Channel', url: `https://t.me/${BOT_USERNAME || 'BOT_USERNAME'}?startchannel=new` }
+    ],
+    [
+      { text: '👤 Contact Owner', url: `tg://user?id=${OWNER_ID}` }
+    ]
+  ]
+};
 
 const FANCY = (() => {
   const build = (up, low, dig) => {
@@ -83,7 +98,7 @@ const FANCY = (() => {
   };
 })();
 
-const htmlEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const htmlEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');
 
 function log(type, ...msg) {
   console.log(`[${new Date().toISOString()}] [${String(type).toUpperCase()}]`, ...msg);
@@ -98,8 +113,6 @@ function getRuntime() {
 }
 
 // ───────────────── Music Data ─────────────────
-// music.queue: [{ title, artist, url, duration, addedBy }]
-// music.current: { index, playing, track }
 function loadData() {
   try {
     if (!fs.existsSync(DATA_FILE)) return { queue: [], current: { index: -1, playing: false, track: null } };
@@ -124,12 +137,6 @@ function saveData() {
 }
 
 // ───────────────── Rich card helpers ─────────────────
-function footerHtml() {
-  const brandText = FANCY(htmlEsc(BRAND_NAME).toUpperCase(), 'bold');
-  const brand = BRAND_LINK ? `<a href="${BRAND_LINK}">${brandText}</a>` : `<b>${brandText}</b>`;
-  return `✦ ${brand}${DEV_TAG ? '  •  ⚡ ' + htmlEsc(DEV_TAG) : ''} ✦`;
-}
-
 function cardShell(title, bodyHtml) {
   return (
     `<b>╭${'━'.repeat(26)}╮</b>\n   ${title}\n<b>╰${'━'.repeat(26)}╯</b>\n\n` +
@@ -150,12 +157,14 @@ async function sendRichCard(ctx, chatId, built, fallbackHtml, extra = {}, opts =
     }
   };
 
+  const richExtra = { ...extra, ...(extra.reply_markup !== undefined ? {} : { reply_markup: INLINE_KEYBOARD }) };
+
   if (tg.sendRichMessage) {
     const withEffect = await attempt('rich+effect', () =>
-      tg.sendRichMessage(chatId, normalizedBuilt, { ...extra, message_effect_id: '5046509860389126442' })
+      tg.sendRichMessage(chatId, normalizedBuilt, { ...richExtra, message_effect_id: '5046509860389126442' })
     );
     if (withEffect) return withEffect;
-    const plainRich = await attempt('rich', () => tg.sendRichMessage(chatId, normalizedBuilt, extra));
+    const plainRich = await attempt('rich', () => tg.sendRichMessage(chatId, normalizedBuilt, richExtra));
     if (plainRich) return plainRich;
   }
   const htmlMsg = await attempt('html', () =>
@@ -173,7 +182,6 @@ async function sendRichCard(ctx, chatId, built, fallbackHtml, extra = {}, opts =
 const app = express();
 app.use(express.json());
 
-// Health check
 app.get('/ping', (req, res) => res.json({ status: 'alive', uptime: getRuntime() }));
 app.get('/health', (req, res) => res.json({ status: 'ok', brand: BRAND_NAME, uptime: getRuntime() }));
 
@@ -284,30 +292,29 @@ app.get('/current', (req, res) => res.json(music.current));
 app.get('/queue', (req, res) => res.json(music.queue));
 
 const server = app.listen(PORT, '0.0.0.0', () =>
-  log('success', `Music server listening on 0.0.0.0:${PORT}  (/ping, /player, /play, /pause, /skip)`
+  log('success', `Music server listening on 0.0.0.0:${PORT}  (/ping, /player, /play, /pause, /skip)`)
 );
 
 // ───────────────── Telegram Bot ─────────────────
-const { Telegraf } = require('telegraf');
 const bot = new Telegraf(BOT_TOKEN);
 
-// Middleware: super reactions on messages
+// Middleware: super reactions on private messages
 bot.use(async (ctx, next) => {
   try {
     const msg = ctx.message;
     if (msg && msg.message_id && ctx.chat && ctx.chat.type === 'private' && !msg.from?.is_bot) {
-      // silent reaction
+      // silent reaction placeholder
     }
   } catch (e) { /* silent */ }
   return next();
 });
 
-// /start — welcome card
+// /start — welcome card with inline buttons
 bot.start(async (ctx) => {
   const built = new RH()
     .heading(1, `🎵 ${FANCY(htmlEsc(BRAND_NAME).toUpperCase(), 'bold')}`)
     .paragraph(`Welcome, ${htmlEsc((ctx.from && ctx.from.first_name) || 'User')} 🎉`)
-    .paragraph(RH.italic(FANCY('Premium music bot with HTML player view — built for VIPs.', 'bold')))
+    .paragraph(FANCY('Premium music bot with HTML player view — built for VIPs.', 'bold'))
     .divider()
     .heading(2, '◆ COMMANDS')
     .table(
@@ -323,65 +330,130 @@ bot.start(async (ctx) => {
         ['/menu', 'Show this commands page'],
       ],
       { bordered: true, striped: true, hasHeader: true, compact: true }
-    )
-    .paragraph(`💬 Support: ${DEV_TAG}`);
+    );
 
   const fallback =
     `<b>『 ${FANCY(BRAND_NAME.toUpperCase(), 'bold')} 』</b>\n${DIVIDER}\n\n` +
     `🎵 <b>Welcome, ${htmlEsc((ctx.from && ctx.from.first_name) || 'User')}!</b>\n\n` +
     `🎧 <b>MUSIC BOT COMMANDS</b>\n\n` +
-    `• /play — Play music\\n` +
-    `• /pause — Pause\\n` +
-    `• /resume — Resume\\n` +
-    `• /skip — Skip track\\n` +
-    `• /queue — Show queue\\n` +
-    `• /current — Current track\\n` +
-    `• /nowplaying — Open player card\\n\\n` +
-    `🌐 HTML Player: ${PUBLIC_URL}/player\\n\\n` +
-    `👤 Support: ${DEV_TAG}`;
+    `• /play — Play music\n` +
+    `• /pause — Pause\n` +
+    `• /resume — Resume\n` +
+    `• /skip — Skip track\n` +
+    `• /queue — Show queue\n` +
+    `• /current — Current track\n` +
+    `• /nowplaying — Open player card\n` +
+    `• /menu — Show commands\n\n` +
+    `🌐 HTML Player: ${PUBLIC_URL}/player`;
 
-  const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: true });
-  if (msg && msg.message_id) {
-    try { await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '🎵' }] }); } catch (_) {}
+  try {
+    const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, { reply_markup: INLINE_KEYBOARD }, { celebration: true });
+    if (msg && msg.message_id) {
+      try {
+        await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '🎵' }] });
+      } catch (reErr) {
+        log('warn', 'Reaction failed for /start:', reErr && reErr.message ? reErr.message : reErr);
+      }
+    }
+  } catch (e) {
+    log('warn', '/start sendRichCard failed:', e && e.message ? e.message : e);
+    try {
+      await ctx.reply(fallback, { parse_mode: 'HTML', reply_markup: INLINE_KEYBOARD });
+    } catch (fbErr) {
+      log('warn', '/start fallback reply failed:', fbErr && fbErr.message ? fbErr.message : fbErr);
+    }
   }
 });
 
 // /menu — commands page
 bot.command('menu', async (ctx) => {
-  const built = new RH()
-    .heading(2, '⌨️ COMMANDS')
-    .table(
-      [
-        ['Command', 'What it does'],
-        ['/start', 'Welcome card'],
-        ['/play', 'Play music'],
-        ['/pause', 'Pause current track'],
-        ['/resume', 'Resume playback'],
-        ['/skip', 'Skip to next track'],
-        ['/queue', 'Show current queue'],
-        ['/current', 'Show currently playing track'],
-        ['/nowplaying', 'Open rich music player card'],
-      ],
-      { bordered: true, striped: true, hasHeader: true, compact: true }
-    )
-    .paragraph(`💬 Support: ${DEV_TAG}`);
+  try {
+    const built = new RH()
+      .heading(2, '⌨️ COMMANDS')
+      .table(
+        [
+          ['Command', 'What it does'],
+          ['/start', 'Welcome card'],
+          ['/play', 'Play music'],
+          ['/pause', 'Pause current track'],
+          ['/resume', 'Resume playback'],
+          ['/skip', 'Skip to next track'],
+          ['/queue', 'Show current queue'],
+          ['/current', 'Show currently playing track'],
+          ['/nowplaying', 'Open rich music player card'],
+        ],
+        { bordered: true, striped: true, hasHeader: true, compact: true }
+      );
 
-  const fallback =
-    `<b>『 ${FANCY(BRAND_NAME.toUpperCase(), 'bold')} 』</b>\n${DIVIDER}\n\n` +
-    `⌨️ <b>COMMANDS</b>\n\n` +
-    `• /start — Welcome card\\n` +
-    `• /play — Play music\\n` +
-    `• /pause — Pause\\n` +
-    `• /resume — Resume\\n` +
-    `• /skip — Skip track\\n` +
-    `• /queue — Show queue\\n` +
-    `• /current — Current track\\n` +
-    `• /nowplaying — Open player card\\n\\n` +
-    `🌐 HTML Player: ${PUBLIC_URL}/player\\n\\n` +
-    `👤 Support: ${DEV_TAG}`;
+    const fallback =
+      `<b>『 ${FANCY(BRAND_NAME.toUpperCase(), 'bold')} 』</b>\n${DIVIDER}\n\n` +
+      `⌨️ <b>COMMANDS</b>\n\n` +
+      `• /start — Welcome card\n` +
+      `• /play — Play music\n` +
+      `• /pause — Pause\n` +
+      `• /resume — Resume\n` +
+      `• /skip — Skip track\n` +
+      `• /queue — Show queue\n` +
+      `• /current — Current track\n` +
+      `• /nowplaying — Open player card\n\n` +
+      `🌐 HTML Player: ${PUBLIC_URL}/player`;
 
-  const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
-  try { await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '⌨️' }] }); } catch (_) {}
+    const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, { reply_markup: INLINE_KEYBOARD }, { celebration: false });
+    try {
+      await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '⌨️' }] });
+    } catch (reErr) {
+      log('warn', 'Reaction failed for /menu:', reErr && reErr.message ? reErr.message : reErr);
+    }
+  } catch (e) {
+    log('warn', '/menu command failed:', e && e.message ? e.message : e);
+    try {
+      await ctx.reply('⚠️ Menu failed to load. Try again.', { parse_mode: 'HTML' });
+    } catch (fbErr) {
+      log('warn', '/menu fallback reply failed:', fbErr && fbErr.message ? fbErr.message : fbErr);
+    }
+  }
+});
+
+// Inline button: Menu callback
+bot.action('menu', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    const built = new RH()
+      .heading(2, '⌨️ COMMANDS')
+      .table(
+        [
+          ['Command', 'What it does'],
+          ['/start', 'Welcome card'],
+          ['/play', 'Play music'],
+          ['/pause', 'Pause current track'],
+          ['/resume', 'Resume playback'],
+          ['/skip', 'Skip to next track'],
+          ['/queue', 'Show current queue'],
+          ['/current', 'Show currently playing track'],
+          ['/nowplaying', 'Open rich music player card'],
+        ],
+        { bordered: true, striped: true, hasHeader: true, compact: true }
+      );
+
+    const fallback =
+      `⌨️ <b>COMMANDS</b>\n\n` +
+      `• /start — Welcome card\n` +
+      `• /play — Play music\n` +
+      `• /pause — Pause\n` +
+      `• /resume — Resume\n` +
+      `• /skip — Skip track\n` +
+      `• /queue — Show queue\n` +
+      `• /current — Current track\n` +
+      `• /nowplaying — Open player card\n\n` +
+      `🌐 HTML Player: ${PUBLIC_URL}/player`;
+
+    await ctx.editMessageText(fallback, { parse_mode: 'HTML', reply_markup: INLINE_KEYBOARD });
+  } catch (e) {
+    log('warn', 'Menu callback failed:', e && e.message ? e.message : e);
+    try {
+      await ctx.answerCbQuery('⚠️ Menu failed to load.');
+    } catch (_) { /* silent */ }
+  }
 });
 
 // /play — play music
@@ -396,7 +468,7 @@ bot.command('play', async (ctx) => {
     const built = new RH()
       .heading(2, '⚠️ USAGE')
       .paragraph(`Send: <code>/play Song Title — Artist — URL</code>\nOr reply to an audio file with <code>/play</code>`);
-    const fallback = `⚠️ USAGE\n\nSend: /play Song Title — Artist — URL\nOr reply to an audio file with /play\n\n👤 Support: ${DEV_TAG}`;
+    const fallback = `⚠️ USAGE\n\nSend: /play Song Title — Artist — URL\nOr reply to an audio file with /play`;
     await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     return;
   }
@@ -434,8 +506,7 @@ bot.command('play', async (ctx) => {
   const fallback =
     `<b>『 ${FANCY(BRAND_NAME.toUpperCase(), 'bold')} 』</b>\n${DIVIDER}\n\n` +
     `✅ <b>TRACK ADDED</b>\n\n` +
-    `${title} by ${artist}\nPosition: ${music.queue.length}\n\n` +
-    `👤 Support: ${DEV_TAG}`;
+    `${title} by ${artist}\nPosition: ${music.queue.length}`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
 
@@ -475,7 +546,7 @@ bot.command('queue', async (ctx) => {
   const lines = music.queue.map((t, i) =>
     `${i === music.current.index ? '🎧' : '  '} ${i + 1}. ${htmlEsc(t.title)} — ${htmlEsc(t.artist)}`
   ).join('\n');
-  await ctx.reply(`📋 <b>QUEUE</b>\n\n${lines}\n\n👤 Support: ${DEV_TAG}`, { parse_mode: 'HTML' });
+  await ctx.reply(`📋 <b>QUEUE</b>\n\n${lines}`, { parse_mode: 'HTML' });
 });
 
 // /current
@@ -485,14 +556,14 @@ bot.command('current', async (ctx) => {
     return;
   }
   const t = music.current.track;
-  await ctx.reply(`🎧 <b>NOW PLAYING</b>\n\n${t.title}\nBy: ${t.artist}\nStatus: ${music.current.playing ? '▶ Playing' : '⏸ Paused'}\n\n👤 Support: ${DEV_TAG}`, { parse_mode: 'HTML' });
+  await ctx.reply(`🎧 <b>NOW PLAYING</b>\n\n${t.title}\nBy: ${t.artist}\nStatus: ${music.current.playing ? '▶ Playing' : '⏸ Paused'}`, { parse_mode: 'HTML' });
 });
 
 // /nowplaying — rich card with HTML player link
 bot.command('nowplaying', async (ctx) => {
   if (!music.current.track) {
     const built = new RH().heading(2, '⚠️ NO TRACK').paragraph('No music is currently playing.');
-    const fallback = `⚠️ NO TRACK\n\nNo music is currently playing.\n\n👤 Support: ${DEV_TAG}`;
+    const fallback = `⚠️ NO TRACK\n\nNo music is currently playing.`;
     await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     return;
   }
@@ -503,14 +574,12 @@ bot.command('nowplaying', async (ctx) => {
     .paragraph(`By: <b>${htmlEsc(t.artist)}</b>`)
     .paragraph(`Status: ${music.current.playing ? '▶ Playing' : '⏸ Paused'}`)
     .divider()
-    .paragraph(`🌐 <a href="${PUBLIC_URL}/player">Open HTML Player</a>`)
-    .paragraph(`👤 Support: ${DEV_TAG}`);
+    .paragraph(`🌐 <a href="${PUBLIC_URL}/player">Open HTML Player</a>`);
   const fallback =
     `<b>『 ${FANCY(BRAND_NAME.toUpperCase(), 'bold')} 』</b>\n${DIVIDER}\n\n` +
     `🎧 <b>NOW PLAYING</b>\n\n` +
     `${t.title}\nBy: ${t.artist}\nStatus: ${music.current.playing ? '▶ Playing' : '⏸ Paused'}\n\n` +
-    `🌐 HTML Player: ${PUBLIC_URL}/player\n\n` +
-    `👤 Support: ${DEV_TAG}`;
+    `🌐 HTML Player: ${PUBLIC_URL}/player`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
 
@@ -522,13 +591,23 @@ bot.command('verify_join', async (ctx) => {
     .paragraph('1. Send a join request to the channel')
     .paragraph('2. Wait for admin approval')
     .paragraph('3. Use /current to see what is playing');
-  const fallback = `✅ VERIFY JOIN\n\n1. Send a join request to the channel\n2. Wait for admin approval\n3. Use /current to see what is playing\n\n👤 Support: ${DEV_TAG}`;
+  const fallback = `✅ VERIFY JOIN\n\n1. Send a join request to the channel\n2. Wait for admin approval\n3. Use /current to see what is playing`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
 
 // ───────────────── Launch ─────────────────
 async function launch() {
   try {
+    // Fetch bot username for inline keyboard deep links
+    try {
+      const me = await bot.telegram.getMe();
+      if (me.username && !BOT_USERNAME) {
+        INLINE_KEYBOARD.inline_keyboard[0][1].url = `https://t.me/${me.username}?startchannel=new`;
+      }
+    } catch (e) {
+      log('warn', 'Could not fetch bot username for deep links:', e.message);
+    }
+
     await bot.launch({ drop_pending_updates: false });
     log('success', `Music bot is polling… (brand: ${BRAND_NAME})`);
   } catch (e) {

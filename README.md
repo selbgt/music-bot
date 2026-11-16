@@ -32,15 +32,28 @@ git clone https://github.com/YOUR_USERNAME/music-bot.git
 cd music-bot
 npm install
 cp .env.example .env
-# Edit .env with your BOT_TOKEN and OWNER_ID
+# Edit .env with your BOT_TOKEN, OWNER_ID, and BOT_USERNAME
 npm start
 ```
 
 ## Deploy on Render
 
 1. Connect this repo to Render
-2. Add env vars: `BOT_TOKEN`, `OWNER_ID`, `BRAND_NAME`, `PUBLIC_URL`, `DEV_TAG`
+2. Add env vars: `BOT_TOKEN`, `OWNER_ID`, `BOT_USERNAME`, `BRAND_NAME`, `PUBLIC_URL`, `DEV_TAG`
 3. Deploy — bot starts polling automatically
+
+## Inline Buttons
+
+`/start` shows exactly 3 inline buttons:
+
+| Row | Buttons |
+|-----|---------|
+| 1 | 📋 Menu · ➕ Add Me to Channel |
+| 2 | 👤 Contact Owner |
+
+- **Menu** — opens the commands page (callback)
+- **Add Me to Channel** — deep link `?startchannel=new` to add bot to a channel
+- **Contact Owner** — direct chat with the bot owner via `tg://user?id=OWNER_ID`
 
 ## Tech Stack
 
