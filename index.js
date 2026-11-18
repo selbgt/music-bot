@@ -99,19 +99,44 @@ const FANCY = (() => {
     return map;
   };
   const fonts = {
-    bold: build(0x1D400, 0x1D41A, 0x1D7CE),
-    sans: build(0x1D5D4, 0x1D5EE, 0x1D7EC),
-    mono: build(0x1D670, 0x1D68A, 0x1D7F6),
-    script: build(0x1D4D0, 0x1D4EA, 0x1D7CE),
-    fraktur: build(0x1D504, 0x1D51E, 0x1D7CE),
-    double: build(0x1D538, 0x1D552, 0x1D7CE),
-    bfractur: build(0x1D56C, 0x1D586, 0x1D7CE),
+    bold: build(0x1D400, 0x1D41A, 0x1D7CE),           // 𝐀𝐁𝐂
+    italic: build(0x1D7D4, 0x1D7EE, 0x1D7CE),         // 𝘼𝘽𝘾
+    boldItalic: build(0x1D7D4, 0x1D7EE, 0x1D7CE),     // 𝘼𝘽𝘾
+    sans: build(0x1D5D4, 0x1D5EE, 0x1D7EC),           // 𝘼𝘽𝘾
+    sansBold: build(0x1D7EC, 0x1D806, 0x1D7CE),       // 𝗔𝗕𝗖
+    sansBoldItalic: build(0x1D7EC, 0x1D806, 0x1D7CE), // 𝘼𝘽𝘾
+    script: build(0x1D4D0, 0x1D4EA, 0x1D7CE),         // 𝓐𝓑𝓒
+    boldScript: build(0x1D4D0, 0x1D4EA, 0x1D7CE),     // 𝓗𝓮𝓵𝓵𝓸
+    fraktur: build(0x1D504, 0x1D51E, 0x1D7CE),        // 𝔄𝔅ℭ
+    double: build(0x1D538, 0x1D552, 0x1D7CE),         // 𝔸𝔹ℂ
   };
   return (text, font = 'bold') => {
     const m = fonts[font] || fonts.sans;
     return String(text).split('').map((c) => m[c] || c).join('');
   };
 })();
+
+// Premium decorative elements
+const PREMIUM = {
+  div: '◈┆❋𓆩𓆪࿐',
+  emoji: {
+    sparkle: '✨',
+    star: '🌟',
+    glow: '💫',
+    heart: '💖',
+    gift: '💝',
+    pleading: '🥹',
+    music: '🎵',
+    headphone: '🎧',
+    lightning: '⚡',
+    fire: '🔥',
+    crown: '👑',
+    diamond: '💎',
+    magic: '🪄',
+  },
+};
+
+const divLine = () => `${PREMIUM.emoji.sparkle} ${PREMIUM.div} ${PREMIUM.emoji.sparkle}`;
 
 const htmlEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');
 
@@ -380,20 +405,20 @@ bot.start(async (ctx) => {
   try {
     const built = new RH()
       .photo(WELCOME_IMAGE_URL)
-      .heading(1, `🎵 ${FANCY(BRAND_NAME.toUpperCase(), 'bold')}`)
-      .paragraph(`Hey 🎵 ${FANCY(BRAND_NAME, 'bold')}!`)
-      .paragraph(`This is **${BRAND_NAME}!**`)
-      .paragraph(`A music player bot with some awesome and useful features.`)
-      .paragraph(`Click on the help button for more info.`)
-      .divider()
-      .paragraph(`🤖 ${FANCY(BRAND_NAME, 'bold')}`);
+      .heading(1, `${PREMIUM.emoji.music} ${FANCY(BRAND_NAME.toUpperCase(), 'boldScript')}`)
+      .paragraph(`${PREMIUM.emoji.pleading} Hey ${FANCY(BRAND_NAME, 'boldScript')} ${PREMIUM.emoji.sparkle}!`)
+      .paragraph(`${PREMIUM.emoji.star} This is ${FANCY(BRAND_NAME, 'boldScript')} ${PREMIUM.emoji.star}`)
+      .paragraph(`${PREMIUM.emoji.magic} A music player bot with some awesome and useful features.`)
+      .paragraph(`${PREMIUM.emoji.lightning} Click on the help button for more info.`)
+      .paragraph(divLine())
+      .paragraph(`${PREMIUM.emoji.crown} ${FANCY(BRAND_NAME, 'boldScript')}`);
 
     const fallback =
-      `Hey 🎵 ${BRAND_NAME}!\n\n` +
-      `This is ${BRAND_NAME}!\n\n` +
-      `A music player bot with some awesome and useful features.\n\n` +
-      `Click on the help button for more info.\n\n` +
-      `🤖 ${BRAND_NAME}`;
+      `${PREMIUM.emoji.music} Hey ${BRAND_NAME}! ${PREMIUM.emoji.sparkle}\n\n` +
+      `${PREMIUM.emoji.star} This is ${BRAND_NAME}! ${PREMIUM.emoji.star}\n\n` +
+      `${PREMIUM.emoji.magic} A music player bot with some awesome and useful features.\n\n` +
+      `${PREMIUM.emoji.lightning} Click on the help button for more info.\n\n` +
+      `${PREMIUM.emoji.crown} ${BRAND_NAME}`;
 
     const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, { reply_markup: INLINE_KEYBOARD }, { celebration: true });
     if (msg && msg.message_id) {
@@ -417,8 +442,9 @@ bot.start(async (ctx) => {
 bot.command('login', async (ctx) => {
   if (ctx.from.id !== OWNER_ID) {
     const built = new RH()
-      .heading(2, '⚠️ ACCESS DENIED')
-      .paragraph('Only the owner can use /login.');
+      .heading(2, `${PREMIUM.emoji.fire} ${FANCY('ACCESS DENIED', 'boldScript')}`)
+      .paragraph(`${PREMIUM.emoji.sparkle} Only the owner can use /login.`)
+      .paragraph(divLine());
     const fallback = `⚠️ ACCESS DENIED\n\nOnly the owner can use /login.`;
     await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     return;
@@ -426,10 +452,11 @@ bot.command('login', async (ctx) => {
   const parts = ctx.message.text.split(/\s+/).slice(1);
   if (parts.length < 3) {
     const built = new RH()
-      .heading(2, '❌ USAGE')
-      .paragraph(`Send: <code>/login <API_ID> <API_HASH> <SESSION_STRING></code>`)
-      .paragraph(`Get API_ID & API_HASH from my.telegram.org/apps`)
-      .paragraph(`Get SESSION_STRING from @StringFatherBot`);
+      .heading(2, `${PREMIUM.emoji.fire} ${FANCY('USAGE', 'boldScript')}`)
+      .paragraph(`${PREMIUM.emoji.sparkle} Send: <code>/login <API_ID> <API_HASH> <SESSION_STRING></code>`)
+      .paragraph(`${PREMIUM.emoji.music} Get API_ID & API_HASH from my.telegram.org/apps`)
+      .paragraph(`${PREMIUM.emoji.diamond} Get SESSION_STRING from @StringFatherBot`)
+      .paragraph(divLine());
     const fallback = `❌ USAGE\n\nSend: /login <API_ID> <API_HASH> <SESSION_STRING>\n\nGet API_ID & API_HASH from my.telegram.org/apps\nGet SESSION_STRING from @StringFatherBot`;
     await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     return;
@@ -438,11 +465,12 @@ bot.command('login', async (ctx) => {
   ownerApiHash = parts[1];
   ownerSession = parts[2];
   const built = new RH()
-    .heading(2, '✅ OWNER LOGIN SAVED')
-    .paragraph(`API_ID: <code>${htmlEsc(ownerApiId)}</code>`)
-    .paragraph(`API_HASH: <code>${htmlEsc(ownerApiHash)}</code>`)
-    .paragraph(`SESSION: <code>${htmlEsc(ownerSession.substring(0, 10))}...</code>`)
-    .paragraph('Voice call assistant is ready.');
+    .heading(2, `${PREMIUM.emoji.gift} ${FANCY('OWNER LOGIN SAVED', 'boldScript')}`)
+    .paragraph(`${PREMIUM.emoji.diamond} API_ID: <code>${htmlEsc(ownerApiId)}</code>`)
+    .paragraph(`${PREMIUM.emoji.diamond} API_HASH: <code>${htmlEsc(ownerApiHash)}</code>`)
+    .paragraph(`${PREMIUM.emoji.diamond} SESSION: <code>${htmlEsc(ownerSession.substring(0, 10))}...</code>`)
+    .paragraph(`${PREMIUM.emoji.magic} Voice call assistant is ready.`)
+    .paragraph(divLine());
   const fallback = `✅ OWNER LOGIN SAVED\n\nAPI_ID: ${ownerApiId}\nAPI_HASH: ${ownerApiHash}\nSESSION: ${ownerSession.substring(0, 10)}...\nVoice call assistant is ready.`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
@@ -451,8 +479,9 @@ bot.command('login', async (ctx) => {
 bot.command('logout', async (ctx) => {
   if (ctx.from.id !== OWNER_ID) {
     const built = new RH()
-      .heading(2, '⚠️ ACCESS DENIED')
-      .paragraph('Only the owner can use /logout.');
+      .heading(2, `${PREMIUM.emoji.fire} ${FANCY('ACCESS DENIED', 'boldScript')}`)
+      .paragraph(`${PREMIUM.emoji.sparkle} Only the owner can use /logout.`)
+      .paragraph(divLine());
     const fallback = `⚠️ ACCESS DENIED\n\nOnly the owner can use /logout.`;
     await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     return;
@@ -461,20 +490,22 @@ bot.command('logout', async (ctx) => {
   ownerApiId = null;
   ownerApiHash = null;
   const built = new RH()
-    .heading(2, '✅ SESSION CLEARED')
-    .paragraph('Owner session cleared successfully.');
+    .heading(2, `${PREMIUM.emoji.gift} ${FANCY('SESSION CLEARED', 'boldScript')}`)
+    .paragraph(`${PREMIUM.emoji.sparkle} Owner session cleared successfully.`)
+    .paragraph(divLine());
   const fallback = `✅ SESSION CLEARED\n\nOwner session cleared successfully.`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
 
 // /assistant — Check assistant status
 bot.command('assistant', async (ctx) => {
-  const status = ownerSession ? '✅ Active' : '❌ Not Logged In';
+  const status = ownerSession ? `${PREMIUM.emoji.heart} Active` : `${PREMIUM.emoji.fire} Not Logged In`;
   const built = new RH()
-    .heading(2, '🤖 VOICE CALL ASSISTANT')
-    .paragraph(`Status: ${status}`)
-    .paragraph(`Owner: <code>${OWNER_ID}</code>`)
-    .paragraph('Use /login to set up assistant for voice calls.');
+    .heading(2, `${PREMIUM.emoji.headphone} ${FANCY('VOICE CALL ASSISTANT', 'boldScript')}`)
+    .paragraph(`${PREMIUM.emoji.diamond} Status: ${status}`)
+    .paragraph(`${PREMIUM.emoji.diamond} Owner: <code>${OWNER_ID}</code>`)
+    .paragraph(`${PREMIUM.emoji.lightning} Use /login to set up assistant for voice calls.`)
+    .paragraph(divLine());
   const fallback = `🤖 VOICE CALL ASSISTANT\n\nStatus: ${status}\nOwner: ${OWNER_ID}\nUse /login to set up assistant for voice calls.`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
@@ -533,20 +564,20 @@ bot.action('help', async (ctx) => {
   try {
     await ctx.answerCbQuery();
     const built = new RH()
-      .heading(2, `🎵 ${BRAND_NAME} — Help`)
-      .paragraph('**Commands:**')
-      .paragraph(`• /play <song> — Play audio in voice chat`)
-      .paragraph(`• /vplay <song> — Play video in voice chat`)
-      .paragraph(`• /skip — Skip current track`)
-      .paragraph(`• /stop — Stop & leave voice chat`)
-      .paragraph(`• /pause — Pause playback`)
-      .paragraph(`• /resume — Resume playback`)
-      .paragraph(`• /queue — Show current queue`)
-      .paragraph(`• /current — Show currently playing track`)
-      .paragraph(`• /nowplaying — Open rich music player card`)
-      .paragraph(`• /menu — Show this commands page`)
-      .divider()
-      .paragraph(`🤖 ${FANCY(BRAND_NAME, 'bold')}`);
+      .heading(2, `${PREMIUM.emoji.music} ${FANCY(`${BRAND_NAME} — Help`, 'boldScript')}`)
+      .paragraph(`${PREMIUM.emoji.sparkle} **Commands:**`)
+      .paragraph(`${PREMIUM.emoji.music} /play <song> — Play audio in voice chat`)
+      .paragraph(`${PREMIUM.emoji.headphone} /vplay <song> — Play video in voice chat`)
+      .paragraph(`${PREMIUM.emoji.star} /skip — Skip current track`)
+      .paragraph(`${PREMIUM.emoji.fire} /stop — Stop & leave voice chat`)
+      .paragraph(`${PREMIUM.emoji.pleading} /pause — Pause playback`)
+      .paragraph(`${PREMIUM.emoji.lightning} /resume — Resume playback`)
+      .paragraph(`${PREMIUM.emoji.diamond} /queue — Show current queue`)
+      .paragraph(`${PREMIUM.emoji.gift} /current — Show currently playing track`)
+      .paragraph(`${PREMIUM.emoji.magic} /nowplaying — Open rich music player card`)
+      .paragraph(`${PREMIUM.emoji.crown} /menu — Show this commands page`)
+      .paragraph(divLine())
+      .paragraph(`${PREMIUM.emoji.heart} ${FANCY(BRAND_NAME, 'boldScript')}`);
     const fallback =
       `🎵 ${BRAND_NAME} — Help\n\n` +
       `Commands:\n` +
@@ -575,20 +606,20 @@ bot.action('menu', async (ctx) => {
   try {
     await ctx.answerCbQuery();
     const built = new RH()
-      .heading(2, `⌨️ ${BRAND_NAME} — Commands`)
-      .paragraph(`• /start — Welcome card`)
-      .paragraph(`• /play — Play music`)
-      .paragraph(`• /vplay — Play video`)
-      .paragraph(`• /pause — Pause current track`)
-      .paragraph(`• /resume — Resume playback`)
-      .paragraph(`• /skip — Skip to next track`)
-      .paragraph(`• /stop — Stop & leave voice chat`)
-      .paragraph(`• /queue — Show current queue`)
-      .paragraph(`• /current — Show currently playing track`)
-      .paragraph(`• /nowplaying — Open rich music player card`)
-      .divider()
+      .heading(2, `${PREMIUM.emoji.headphone} ${FANCY(`${BRAND_NAME} — Commands`, 'boldScript')}`)
+      .paragraph(`${PREMIUM.emoji.sparkle} /start — Welcome card`)
+      .paragraph(`${PREMIUM.emoji.music} /play — Play music`)
+      .paragraph(`${PREMIUM.emoji.headphone} /vplay — Play video`)
+      .paragraph(`${PREMIUM.emoji.pleading} /pause — Pause current track`)
+      .paragraph(`${PREMIUM.emoji.lightning} /resume — Resume playback`)
+      .paragraph(`${PREMIUM.emoji.star} /skip — Skip to next track`)
+      .paragraph(`${PREMIUM.emoji.fire} /stop — Stop & leave voice chat`)
+      .paragraph(`${PREMIUM.emoji.diamond} /queue — Show current queue`)
+      .paragraph(`${PREMIUM.emoji.gift} /current — Show currently playing track`)
+      .paragraph(`${PREMIUM.emoji.magic} /nowplaying — Open rich music player card`)
+      .paragraph(divLine())
       .paragraph(`🌐 <a href="${PUBLIC_URL}/player">Open HTML Player</a>`)
-      .paragraph(`🤖 ${FANCY(BRAND_NAME, 'bold')}`);
+      .paragraph(`${PREMIUM.emoji.crown} ${FANCY(BRAND_NAME, 'boldScript')}`);
     const fallback =
       `⌨️ ${BRAND_NAME} — Commands\n\n` +
       `• /start — Welcome card\n` +
@@ -615,7 +646,12 @@ bot.action('menu', async (ctx) => {
 // /play — search yt-dlp and send audio
 bot.command('play', async (ctx) => {
   if (ctx.from.id !== OWNER_ID) {
-    await ctx.reply('⚠️ Only the owner can add music.');
+    const built = new RH()
+      .heading(2, `${PREMIUM.emoji.fire} ${FANCY('ACCESS DENIED', 'boldScript')}`)
+      .paragraph(`${PREMIUM.emoji.sparkle} Only the owner can add music.`)
+      .paragraph(divLine());
+    const fallback = `⚠️ ACCESS DENIED\n\nOnly the owner can add music.`;
+    await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     return;
   }
   const text = ctx.message.text;
@@ -624,8 +660,10 @@ bot.command('play', async (ctx) => {
 
   if (!query && !ctx.message.reply_to_message) {
     const built = new RH()
-      .heading(2, '⚠️ USAGE')
-      .paragraph(`Send: <code>/play Song Name</code> or <code>/play https://youtube.com/...</code>\nOr reply to an audio file with <code>/play</code>`);
+      .heading(2, `${PREMIUM.emoji.fire} ${FANCY('USAGE', 'boldScript')}`)
+      .paragraph(`${PREMIUM.emoji.sparkle} Send: <code>/play Song Name</code> or <code>/play https://youtube.com/...</code>`)
+      .paragraph(`${PREMIUM.emoji.music} Or reply to an audio file with <code>/play</code>`)
+      .paragraph(divLine());
     const fallback = `⚠️ USAGE\n\nSend: /play Song Name or /play https://youtube.com/...\nOr reply to an audio file with /play`;
     await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     return;
@@ -686,14 +724,16 @@ bot.command('play', async (ctx) => {
   saveData();
 
   const built = new RH()
-    .heading(2, '✅ TRACK ADDED')
-    .paragraph(`<b>${htmlEsc(title)}</b> by <b>${htmlEsc(artist)}</b>`)
-    .paragraph(`Duration: <code>${duration}</code>`)
-    .paragraph(`Position in queue: <code>${music.queue.length}</code>`);
+    .heading(2, `${PREMIUM.emoji.gift} ${FANCY('TRACK ADDED', 'boldScript')}`)
+    .paragraph(`${PREMIUM.emoji.music} <b>${htmlEsc(title)}</b> by <b>${htmlEsc(artist)}</b>`)
+    .paragraph(`${PREMIUM.emoji.diamond} Duration: <code>${duration}</code>`)
+    .paragraph(`${PREMIUM.emoji.star} Position in queue: <code>${music.queue.length}</code>`)
+    .paragraph(divLine());
   const fallback =
-    `<b>『 ${FANCY(BRAND_NAME.toUpperCase(), 'bold')} 』</b>\n${DIVIDER}\n\n` +
-    `✅ <b>TRACK ADDED</b>\n\n` +
-    `${title} by ${artist}\nDuration: ${duration}\nPosition: ${music.queue.length}`;
+    `${PREMIUM.emoji.gift} TRACK ADDED\n\n` +
+    `${PREMIUM.emoji.music} ${title} by ${artist}\n` +
+    `${PREMIUM.emoji.diamond} Duration: ${duration}\n` +
+    `${PREMIUM.emoji.star} Position: ${music.queue.length}`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
 
@@ -703,8 +743,9 @@ bot.command('pause', async (ctx) => {
   music.current.playing = false;
   saveData();
   const built = new RH()
-    .heading(2, '⏸ PAUSED')
-    .paragraph('Playback paused.');
+    .heading(2, `${PREMIUM.emoji.pleading} ${FANCY('PAUSED', 'boldScript')}`)
+    .paragraph(`${PREMIUM.emoji.sparkle} Playback paused.`)
+    .paragraph(divLine());
   const fallback = `⏸ PAUSED\n\nPlayback paused.`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
@@ -715,8 +756,9 @@ bot.command('resume', async (ctx) => {
   music.current.playing = true;
   saveData();
   const built = new RH()
-    .heading(2, '▶ RESUMED')
-    .paragraph('Playback resumed.');
+    .heading(2, `${PREMIUM.emoji.lightning} ${FANCY('RESUMED', 'boldScript')}`)
+    .paragraph(`${PREMIUM.emoji.sparkle} Playback resumed.`)
+    .paragraph(divLine());
   const fallback = `▶ RESUMED\n\nPlayback resumed.`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
@@ -726,8 +768,9 @@ bot.command('skip', async (ctx) => {
   if (ctx.from.id !== OWNER_ID) return;
   if (music.queue.length === 0) {
     const built = new RH()
-      .heading(2, '⚠️ QUEUE EMPTY')
-      .paragraph('No tracks in queue.');
+      .heading(2, `${PREMIUM.emoji.fire} ${FANCY('QUEUE EMPTY', 'boldScript')}`)
+      .paragraph(`${PREMIUM.emoji.sparkle} No tracks in queue.`)
+      .paragraph(divLine());
     const fallback = `⚠️ QUEUE EMPTY\n\nNo tracks in queue.`;
     await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     return;
@@ -737,9 +780,10 @@ bot.command('skip', async (ctx) => {
   music.current.track = music.queue[music.current.index];
   saveData();
   const built = new RH()
-    .heading(2, '⏭ TRACK SKIPPED')
-    .paragraph(`<b>${htmlEsc(music.current.track.title)}</b>`)
-    .paragraph(`By: <b>${htmlEsc(music.current.track.artist || 'Unknown')}</b>`);
+    .heading(2, `${PREMIUM.emoji.star} ${FANCY('TRACK SKIPPED', 'boldScript')}`)
+    .paragraph(`${PREMIUM.emoji.music} <b>${htmlEsc(music.current.track.title)}</b>`)
+    .paragraph(`${PREMIUM.emoji.diamond} By: <b>${htmlEsc(music.current.track.artist || 'Unknown')}</b>`)
+    .paragraph(divLine());
   const fallback = `⏭ TRACK SKIPPED\n\n${music.current.track.title}\nBy: ${music.current.track.artist || 'Unknown'}`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
@@ -748,8 +792,9 @@ bot.command('skip', async (ctx) => {
 bot.command('queue', async (ctx) => {
   if (music.queue.length === 0) {
     const built = new RH()
-      .heading(2, '📋 QUEUE')
-      .paragraph('Queue is empty.');
+      .heading(2, `${PREMIUM.emoji.diamond} ${FANCY('QUEUE', 'boldScript')}`)
+      .paragraph(`${PREMIUM.emoji.sparkle} Queue is empty.`)
+      .paragraph(divLine());
     const fallback = `📋 QUEUE\n\nQueue is empty.`;
     await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     return;
@@ -758,10 +803,10 @@ bot.command('queue', async (ctx) => {
     `${i === music.current.index ? '🎧' : '  '} ${i + 1}. ${htmlEsc(t.title)} — ${htmlEsc(t.artist || 'Unknown')} (${t.duration})`
   ).join('\n');
   const built = new RH()
-    .heading(2, '📋 QUEUE')
+    .heading(2, `${PREMIUM.emoji.diamond} ${FANCY('QUEUE', 'boldScript')}`)
     .paragraph(`<code>${lines}</code>`)
-    .divider()
-    .paragraph(`🤖 ${FANCY(BRAND_NAME, 'bold')}`);
+    .paragraph(divLine())
+    .paragraph(`${PREMIUM.emoji.crown} ${FANCY(BRAND_NAME, 'boldScript')}`);
   const fallback = `📋 QUEUE\n\n${lines}\n\n🤖 ${BRAND_NAME}`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
@@ -770,20 +815,21 @@ bot.command('queue', async (ctx) => {
 bot.command('current', async (ctx) => {
   if (!music.current.track) {
     const built = new RH()
-      .heading(2, '⚠️ NO TRACK')
-      .paragraph('No track is currently playing.');
+      .heading(2, `${PREMIUM.emoji.fire} ${FANCY('NO TRACK', 'boldScript')}`)
+      .paragraph(`${PREMIUM.emoji.sparkle} No track is currently playing.`)
+      .paragraph(divLine());
     const fallback = `⚠️ NO TRACK\n\nNo track is currently playing.`;
     await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     return;
   }
   const t = music.current.track;
   const built = new RH()
-    .heading(2, '🎧 NOW PLAYING')
-    .paragraph(`<b>${htmlEsc(t.title)}</b>`)
-    .paragraph(`By: <b>${htmlEsc(t.artist || 'Unknown')}</b>`)
-    .paragraph(`Duration: ${t.duration}`)
-    .paragraph(`Status: ${music.current.playing ? '▶ Playing' : '⏸ Paused'}`)
-    .divider()
+    .heading(2, `${PREMIUM.emoji.headphone} ${FANCY('NOW PLAYING', 'boldScript')}`)
+    .paragraph(`${PREMIUM.emoji.music} <b>${htmlEsc(t.title)}</b>`)
+    .paragraph(`${PREMIUM.emoji.diamond} By: <b>${htmlEsc(t.artist || 'Unknown')}</b>`)
+    .paragraph(`${PREMIUM.emoji.gift} Duration: ${t.duration}`)
+    .paragraph(`${PREMIUM.emoji.star} Status: ${music.current.playing ? '▶ Playing' : '⏸ Paused'}`)
+    .paragraph(divLine())
     .paragraph(`🌐 <a href="${PUBLIC_URL}/player">Open HTML Player</a>`);
   const fallback = `🎧 NOW PLAYING\n\n${t.title}\nBy: ${t.artist || 'Unknown'}\nDuration: ${t.duration}\nStatus: ${music.current.playing ? '▶ Playing' : '⏸ Paused'}\n\n🌐 HTML Player: ${PUBLIC_URL}/player`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
@@ -792,24 +838,29 @@ bot.command('current', async (ctx) => {
 // /nowplaying — rich card with HTML player link
 bot.command('nowplaying', async (ctx) => {
   if (!music.current.track) {
-    const built = new RH().heading(2, '⚠️ NO TRACK').paragraph('No music is currently playing.');
+    const built = new RH()
+      .heading(2, `${PREMIUM.emoji.fire} ${FANCY('NO TRACK', 'boldScript')}`)
+      .paragraph(`${PREMIUM.emoji.sparkle} No music is currently playing.`)
+      .paragraph(divLine());
     const fallback = `⚠️ NO TRACK\n\nNo music is currently playing.`;
     await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     return;
   }
   const t = music.current.track;
   const built = new RH()
-    .heading(2, '🎧 NOW PLAYING')
-    .paragraph(`<b>${htmlEsc(t.title)}</b>`)
-    .paragraph(`By: <b>${htmlEsc(t.artist || 'Unknown')}</b>`)
-    .paragraph(`Duration: ${t.duration}`)
-    .paragraph(`Status: ${music.current.playing ? '▶ Playing' : '⏸ Paused'}`)
-    .divider()
+    .heading(2, `${PREMIUM.emoji.headphone} ${FANCY('NOW PLAYING', 'boldScript')}`)
+    .paragraph(`${PREMIUM.emoji.music} <b>${htmlEsc(t.title)}</b>`)
+    .paragraph(`${PREMIUM.emoji.diamond} By: <b>${htmlEsc(t.artist || 'Unknown')}</b>`)
+    .paragraph(`${PREMIUM.emoji.gift} Duration: ${t.duration}`)
+    .paragraph(`${PREMIUM.emoji.star} Status: ${music.current.playing ? '▶ Playing' : '⏸ Paused'}`)
+    .paragraph(divLine())
     .paragraph(`🌐 <a href="${PUBLIC_URL}/player">Open HTML Player</a>`);
   const fallback =
-    `<b>『 ${FANCY(BRAND_NAME.toUpperCase(), 'bold')} 』</b>\n${DIVIDER}\n\n` +
-    `🎧 <b>NOW PLAYING</b>\n\n` +
-    `${t.title}\nBy: ${t.artist || 'Unknown'}\nDuration: ${t.duration}\nStatus: ${music.current.playing ? '▶ Playing' : '⏸ Paused'}\n\n` +
+    `${PREMIUM.emoji.headphone} NOW PLAYING\n\n` +
+    `${PREMIUM.emoji.music} ${t.title}\n` +
+    `${PREMIUM.emoji.diamond} By: ${t.artist || 'Unknown'}\n` +
+    `${PREMIUM.emoji.gift} Duration: ${t.duration}\n` +
+    `${PREMIUM.emoji.star} Status: ${music.current.playing ? '▶ Playing' : '⏸ Paused'}\n\n` +
     `🌐 HTML Player: ${PUBLIC_URL}/player`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
@@ -817,11 +868,12 @@ bot.command('nowplaying', async (ctx) => {
 // /verify_join command
 bot.command('verify_join', async (ctx) => {
   const built = new RH()
-    .heading(2, '✅ VERIFY JOIN')
-    .paragraph('To verify and join:')
-    .paragraph('1. Send a join request to the channel')
-    .paragraph('2. Wait for admin approval')
-    .paragraph('3. Use /current to see what is playing');
+    .heading(2, `${PREMIUM.emoji.gift} ${FANCY('VERIFY JOIN', 'boldScript')}`)
+    .paragraph(`${PREMIUM.emoji.sparkle} To verify and join:`)
+    .paragraph(`${PREMIUM.emoji.music} 1. Send a join request to the channel`)
+    .paragraph(`${PREMIUM.emoji.diamond} 2. Wait for admin approval`)
+    .paragraph(`${PREMIUM.emoji.star} 3. Use /current to see what is playing`)
+    .paragraph(divLine());
   const fallback = `✅ VERIFY JOIN\n\n1. Send a join request to the channel\n2. Wait for admin approval\n3. Use /current to see what is playing`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
