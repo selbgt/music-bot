@@ -69,21 +69,12 @@ fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
 const START_TS = Date.now();
 const DIVIDER = '⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯';
 
-// Inline keyboard — Fallen Music style: Add me to your group, Help, Support + Channel, Source
+// Inline keyboard — Only ONE button outside card: Add Me To Group 🎶‼️
+// Rest of buttons go inside Telekaf table (card)
 const INLINE_KEYBOARD = {
   inline_keyboard: [
     [
-      { text: 'Add me to your group', url: `https://t.me/${BOT_USERNAME || 'BOT_USERNAME'}?startgroup=true` }
-    ],
-    [
-      { text: 'Help', callback_data: 'help' }
-    ],
-    [
-      { text: 'Support', url: `tg://user?id=${OWNER_ID}` },
-      { text: 'Channel', url: 'https://t.me/DevXMusic' }
-    ],
-    [
-      { text: 'Source', url: 'https://github.com/selbgt/music-bot' }
+      { text: 'Add Me To Group 🎶‼️', url: `https://t.me/${BOT_USERNAME || 'BOT_USERNAME'}?startgroup=true` }
     ]
   ]
 };
@@ -405,19 +396,41 @@ bot.start(async (ctx) => {
   try {
     const built = new RH()
       .photo(WELCOME_IMAGE_URL)
-      .heading(1, `${PREMIUM.emoji.music} ${FANCY(BRAND_NAME.toUpperCase(), 'boldScript')}`)
-      .paragraph(`${PREMIUM.emoji.pleading} Hey ${FANCY(BRAND_NAME, 'boldScript')} ${PREMIUM.emoji.sparkle}!`)
-      .paragraph(`${PREMIUM.emoji.star} This is ${FANCY(BRAND_NAME, 'boldScript')} ${PREMIUM.emoji.star}`)
-      .paragraph(`${PREMIUM.emoji.magic} A music player bot with some awesome and useful features.`)
-      .paragraph(`${PREMIUM.emoji.lightning} Click on the help button for more info.`)
+      .heading(1, `Welcome, ${FANCY('DEV', 'sansBold')} ${FANCY('THE MUSIC BOT', 'sansBold')}`)
+      .paragraph(`${PREMIUM.emoji.music} lets you stream high-quality music and video directly in Telegram voice and video chats.`)
+      .paragraph(`Supported platforms: YouTube, Spotify, Apple Music, SoundCloud, Deezer, Twitch, and many more.`)
+      .paragraph(`Use the buttons below to add the bot to your group or explore the available commands.`)
       .paragraph(divLine())
-      .paragraph(`${PREMIUM.emoji.crown} ${FANCY(BRAND_NAME, 'boldScript')}`);
+      .table(
+        [
+          ['Command', 'Description'],
+          ['/play', 'Play music in voice chat'],
+          ['/vplay', 'Play video in voice chat'],
+          ['/pause', 'Pause current track'],
+          ['/resume', 'Resume playback'],
+          ['/skip', 'Skip to next track'],
+          ['/stop', 'Stop & leave voice chat'],
+          ['/queue', 'Show current queue'],
+          ['/current', 'Show currently playing track'],
+          ['/nowplaying', 'Open rich music player card'],
+          ['/menu', 'Show commands page'],
+        ],
+        { bordered: true, striped: true, hasHeader: true, compact: true }
+      )
+      .paragraph(divLine())
+      .buttonRow([
+        { text: 'Help', callback_data: 'help' },
+        { text: 'Updates', url: 'https://t.me/devxbackup' },
+        { text: 'Group', url: 'https://t.me/devxbackup' },
+      ])
+      .paragraph(divLine())
+      .paragraph(`${PREMIUM.emoji.crown} ${FANCY(BRAND_NAME, 'sansBold')}`);
 
     const fallback =
-      `${PREMIUM.emoji.music} Hey ${BRAND_NAME}! ${PREMIUM.emoji.sparkle}\n\n` +
-      `${PREMIUM.emoji.star} This is ${BRAND_NAME}! ${PREMIUM.emoji.star}\n\n` +
-      `${PREMIUM.emoji.magic} A music player bot with some awesome and useful features.\n\n` +
-      `${PREMIUM.emoji.lightning} Click on the help button for more info.\n\n` +
+      `Welcome, ${FANCY('DEV', 'sansBold')} ${FANCY('THE MUSIC BOT', 'sansBold')}\n\n` +
+      `${PREMIUM.emoji.music} lets you stream high-quality music and video directly in Telegram voice and video chats.\n\n` +
+      `Supported platforms: YouTube, Spotify, Apple Music, SoundCloud, Deezer, Twitch, and many more.\n\n` +
+      `Use the buttons below to add the bot to your group or explore the available commands.\n\n` +
       `${PREMIUM.emoji.crown} ${BRAND_NAME}`;
 
     const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, { reply_markup: INLINE_KEYBOARD }, { celebration: true });
