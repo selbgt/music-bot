@@ -69,15 +69,21 @@ fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
 const START_TS = Date.now();
 const DIVIDER = '⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯';
 
-// Inline keyboard: 3 buttons — Menu + Add Me to Channel on top row, Contact Owner below
+// Inline keyboard — Fallen Music style: Add me to your group, Help, Support + Channel, Source
 const INLINE_KEYBOARD = {
   inline_keyboard: [
     [
-      { text: '📋 Menu', callback_data: 'menu' },
-      { text: '➕ Add Me to Channel', url: `https://t.me/${BOT_USERNAME || 'BOT_USERNAME'}?startchannel=new` }
+      { text: 'Add me to your group', url: `https://t.me/${BOT_USERNAME || 'BOT_USERNAME'}?startgroup=true` }
     ],
     [
-      { text: '👤 Contact Owner', url: `tg://user?id=${OWNER_ID}` }
+      { text: 'Help', callback_data: 'help' }
+    ],
+    [
+      { text: 'Support', url: `tg://user?id=${OWNER_ID}` },
+      { text: 'Channel', url: 'https://t.me/DevXMusic' }
+    ],
+    [
+      { text: 'Source', url: 'https://github.com/selbgt/music-bot' }
     ]
   ]
 };
@@ -361,45 +367,17 @@ bot.use(async (ctx, next) => {
   return next();
 });
 
-// /start — welcome card with inline buttons
+// /start — welcome card with inline buttons (Fallen Music style)
 bot.start(async (ctx) => {
-  const built = new RH()
-    .heading(1, `🎵 ${FANCY(htmlEsc(BRAND_NAME).toUpperCase(), 'bold')}`)
-    .paragraph(`Welcome, ${htmlEsc((ctx.from && ctx.from.first_name) || 'User')} 🎉`)
-    .paragraph(FANCY('Premium music bot with HTML player view — built for VIPs.', 'bold'))
-    .divider()
-    .heading(2, '◆ COMMANDS')
-    .table(
-      [
-        ['Command', 'What it does'],
-        ['/play', 'Play music (search YouTube or send URL)'],
-        ['/pause', 'Pause current track'],
-        ['/resume', 'Resume playback'],
-        ['/skip', 'Skip to next track'],
-        ['/queue', 'Show current queue'],
-        ['/current', 'Show currently playing track'],
-        ['/nowplaying', 'Open rich music player card'],
-        ['/menu', 'Show this commands page'],
-      ],
-      { bordered: true, striped: true, hasHeader: true, compact: true }
-    );
-
-  const fallback =
-    `<b>『 ${FANCY(BRAND_NAME.toUpperCase(), 'bold')} 』</b>\n${DIVIDER}\n\n` +
-    `🎵 <b>Welcome, ${htmlEsc((ctx.from && ctx.from.first_name) || 'User')}!</b>\n\n` +
-    `🎧 <b>MUSIC BOT COMMANDS</b>\n\n` +
-    `• /play — Play music\n` +
-    `• /pause — Pause\n` +
-    `• /resume — Resume\n` +
-    `• /skip — Skip track\n` +
-    `• /queue — Show queue\n` +
-    `• /current — Current track\n` +
-    `• /nowplaying — Open player card\n` +
-    `• /menu — Show commands\n\n` +
-    `🌐 HTML Player: ${PUBLIC_URL}/player`;
+  const text =
+    `Hey 🎵 **${BRAND_NAME}!**\n\n` +
+    `This is **${BRAND_NAME}!**\n\n` +
+    `A music player bot with some awesome and useful features.\n\n` +
+    `Click on the help button for more info.\n\n` +
+    `🤖 **${BRAND_NAME}**`;
 
   try {
-    const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, { reply_markup: INLINE_KEYBOARD }, { celebration: true });
+    const msg = await ctx.reply(text, { parse_mode: 'Markdown', reply_markup: INLINE_KEYBOARD });
     if (msg && msg.message_id) {
       try {
         await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '🎵' }] });
@@ -408,9 +386,9 @@ bot.start(async (ctx) => {
       }
     }
   } catch (e) {
-    log('warn', '/start sendRichCard failed:', e && e.message ? e.message : e);
+    log('warn', '/start failed:', e && e.message ? e.message : e);
     try {
-      await ctx.reply(fallback, { parse_mode: 'HTML', reply_markup: INLINE_KEYBOARD });
+      await ctx.reply(text.replace(/\*\*/g, ''), { reply_markup: INLINE_KEYBOARD });
     } catch (fbErr) {
       log('warn', '/start fallback reply failed:', fbErr && fbErr.message ? fbErr.message : fbErr);
     }
@@ -466,40 +444,54 @@ bot.command('menu', async (ctx) => {
   }
 });
 
+// Inline button: Help callback
+bot.action('help', async (ctx) => {
+  try {
+    await ctx.answerCbQuery();
+    const helpText =
+      `🎵 **${BRAND_NAME} — Help**\n\n` +
+      `**Commands:**\n` +
+      `• /play <song> — Play audio in voice chat\n` +
+      `• /vplay <song> — Play video in voice chat\n` +
+      `• /skip — Skip current track\n` +
+      `• /stop — Stop & leave voice chat\n` +
+      `• /pause — Pause playback\n` +
+      `• /resume — Resume playback\n` +
+      `• /queue — Show current queue\n` +
+      `• /current — Show currently playing track\n` +
+      `• /nowplaying — Open rich music player card\n` +
+      `• /menu — Show this commands page\n\n` +
+      `🤖 **${BRAND_NAME}**`;
+
+    await ctx.editMessageText(helpText, { parse_mode: 'Markdown', reply_markup: INLINE_KEYBOARD });
+  } catch (e) {
+    log('warn', 'Help callback failed:', e && e.message ? e.message : e);
+    try {
+      await ctx.answerCbQuery('⚠️ Help failed to load.');
+    } catch (_) { /* silent */ }
+  }
+});
+
 // Inline button: Menu callback
 bot.action('menu', async (ctx) => {
   try {
     await ctx.answerCbQuery();
-    const built = new RH()
-      .heading(2, '⌨️ COMMANDS')
-      .table(
-        [
-          ['Command', 'What it does'],
-          ['/start', 'Welcome card'],
-          ['/play', 'Play music'],
-          ['/pause', 'Pause current track'],
-          ['/resume', 'Resume playback'],
-          ['/skip', 'Skip to next track'],
-          ['/queue', 'Show current queue'],
-          ['/current', 'Show currently playing track'],
-          ['/nowplaying', 'Open rich music player card'],
-        ],
-        { bordered: true, striped: true, hasHeader: true, compact: true }
-      );
-
-    const fallback =
-      `⌨️ <b>COMMANDS</b>\n\n` +
+    const menuText =
+      `⌨️ **${BRAND_NAME} — Commands**\n\n` +
       `• /start — Welcome card\n` +
       `• /play — Play music\n` +
-      `• /pause — Pause\n` +
-      `• /resume — Resume\n` +
-      `• /skip — Skip track\n` +
-      `• /queue — Show queue\n` +
-      `• /current — Current track\n` +
-      `• /nowplaying — Open player card\n\n` +
-      `🌐 HTML Player: ${PUBLIC_URL}/player`;
+      `• /vplay — Play video\n` +
+      `• /pause — Pause current track\n` +
+      `• /resume — Resume playback\n` +
+      `• /skip — Skip to next track\n` +
+      `• /stop — Stop & leave voice chat\n` +
+      `• /queue — Show current queue\n` +
+      `• /current — Show currently playing track\n` +
+      `• /nowplaying — Open rich music player card\n\n` +
+      `🌐 HTML Player: ${PUBLIC_URL}/player\n\n` +
+      `🤖 **${BRAND_NAME}**`;
 
-    await ctx.editMessageText(fallback, { parse_mode: 'HTML', reply_markup: INLINE_KEYBOARD });
+    await ctx.editMessageText(menuText, { parse_mode: 'Markdown', reply_markup: INLINE_KEYBOARD });
   } catch (e) {
     log('warn', 'Menu callback failed:', e && e.message ? e.message : e);
     try {
