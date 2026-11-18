@@ -370,21 +370,32 @@ bot.use(async (ctx, next) => {
 // Welcome image (single image per constraints)
 const WELCOME_IMAGE_URL = 'https://files.catbox.moe/h5wvi8.webp';
 
-// /start — welcome card with inline buttons (Fallen Music style)
-bot.start(async (ctx) => {
-  const caption =
-    `Hey 🎵 **${BRAND_NAME}!**\n\n` +
-    `This is **${BRAND_NAME}!**\n\n` +
-    `A music player bot with some awesome and useful features.\n\n` +
-    `Click on the help button for more info.\n\n` +
-    `🤖 **${BRAND_NAME}**`;
+// Owner login — stored session for voice call assistant
+let ownerSession = process.env.OWNER_SESSION || null;
+let ownerApiId = process.env.OWNER_API_ID || null;
+let ownerApiHash = process.env.OWNER_API_HASH || null;
 
+// /start — Telekaf rich welcome card (Fallen Music style)
+bot.start(async (ctx) => {
   try {
-    const msg = await ctx.replyWithPhoto(WELCOME_IMAGE_URL, {
-      caption: caption,
-      parse_mode: 'Markdown',
-      reply_markup: INLINE_KEYBOARD,
-    });
+    const built = new RH()
+      .photo(WELCOME_IMAGE_URL)
+      .heading(1, `🎵 ${FANCY(BRAND_NAME.toUpperCase(), 'bold')}`)
+      .paragraph(`Hey 🎵 ${FANCY(BRAND_NAME, 'bold')}!`)
+      .paragraph(`This is **${BRAND_NAME}!**`)
+      .paragraph(`A music player bot with some awesome and useful features.`)
+      .paragraph(`Click on the help button for more info.`)
+      .divider()
+      .paragraph(`🤖 ${FANCY(BRAND_NAME, 'bold')}`);
+
+    const fallback =
+      `Hey 🎵 ${BRAND_NAME}!\n\n` +
+      `This is ${BRAND_NAME}!\n\n` +
+      `A music player bot with some awesome and useful features.\n\n` +
+      `Click on the help button for more info.\n\n` +
+      `🤖 ${BRAND_NAME}`;
+
+    const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, { reply_markup: INLINE_KEYBOARD }, { celebration: true });
     if (msg && msg.message_id) {
       try {
         await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '🎵' }] });
@@ -393,13 +404,63 @@ bot.start(async (ctx) => {
       }
     }
   } catch (e) {
-    log('warn', '/start photo failed:', e && e.message ? e.message : e);
+    log('warn', '/start sendRichCard failed:', e && e.message ? e.message : e);
     try {
-      await ctx.reply(caption.replace(/\*\*/g, ''), { reply_markup: INLINE_KEYBOARD });
+      await ctx.reply(fallback.replace(/\*\*/g, ''), { reply_markup: INLINE_KEYBOARD });
     } catch (fbErr) {
       log('warn', '/start fallback reply failed:', fbErr && fbErr.message ? fbErr.message : fbErr);
     }
   }
+});
+
+// /login — Owner login for voice call assistant
+bot.command('login', async (ctx) => {
+  if (ctx.from.id !== OWNER_ID) {
+    await ctx.reply('⚠️ Only the owner can use /login.');
+    return;
+  }
+  const parts = ctx.message.text.split(/\s+/).slice(1);
+  if (parts.length < 3) {
+    await ctx.reply(
+      `❌ **Usage:** /login <API_ID> <API_HASH> <SESSION_STRING>\n\n` +
+      `Get API_ID & API_HASH from my.telegram.org/apps\n` +
+      `Get SESSION_STRING from @StringFatherBot`
+    );
+    return;
+  }
+  ownerApiId = parts[0];
+  ownerApiHash = parts[1];
+  ownerSession = parts[2];
+  await ctx.reply(
+    `✅ **Owner Login Saved!**\n\n` +
+    `API_ID: ${ownerApiId}\n` +
+    `API_HASH: ${ownerApiHash}\n` +
+    `SESSION: ${ownerSession.substring(0, 10)}...\n\n` +
+    `Voice call assistant is ready.`
+  );
+});
+
+// /logout — Clear owner session
+bot.command('logout', async (ctx) => {
+  if (ctx.from.id !== OWNER_ID) {
+    await ctx.reply('⚠️ Only the owner can use /logout.');
+    return;
+  }
+  ownerSession = null;
+  ownerApiId = null;
+  ownerApiHash = null;
+  await ctx.reply('✅ Owner session cleared.');
+});
+
+// /assistant — Check assistant status
+bot.command('assistant', async (ctx) => {
+  const status = ownerSession ? '✅ Active' : '❌ Not Logged In';
+  await ctx.reply(
+    `🤖 **Voice Call Assistant**\n\n` +
+    `Status: ${status}\n` +
+    `Owner: ${OWNER_ID}\n\n` +
+    `Use /login to set up assistant for voice calls.`
+  );
 });
 
 // /menu — commands page
