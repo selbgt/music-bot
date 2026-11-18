@@ -416,51 +416,67 @@ bot.start(async (ctx) => {
 // /login — Owner login for voice call assistant
 bot.command('login', async (ctx) => {
   if (ctx.from.id !== OWNER_ID) {
-    await ctx.reply('⚠️ Only the owner can use /login.');
+    const built = new RH()
+      .heading(2, '⚠️ ACCESS DENIED')
+      .paragraph('Only the owner can use /login.');
+    const fallback = `⚠️ ACCESS DENIED\n\nOnly the owner can use /login.`;
+    await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     return;
   }
   const parts = ctx.message.text.split(/\s+/).slice(1);
   if (parts.length < 3) {
-    await ctx.reply(
-      `❌ **Usage:** /login <API_ID> <API_HASH> <SESSION_STRING>\n\n` +
-      `Get API_ID & API_HASH from my.telegram.org/apps\n` +
-      `Get SESSION_STRING from @StringFatherBot`
-    );
+    const built = new RH()
+      .heading(2, '❌ USAGE')
+      .paragraph(`Send: <code>/login <API_ID> <API_HASH> <SESSION_STRING></code>`)
+      .paragraph(`Get API_ID & API_HASH from my.telegram.org/apps`)
+      .paragraph(`Get SESSION_STRING from @StringFatherBot`);
+    const fallback = `❌ USAGE\n\nSend: /login <API_ID> <API_HASH> <SESSION_STRING>\n\nGet API_ID & API_HASH from my.telegram.org/apps\nGet SESSION_STRING from @StringFatherBot`;
+    await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     return;
   }
   ownerApiId = parts[0];
   ownerApiHash = parts[1];
   ownerSession = parts[2];
-  await ctx.reply(
-    `✅ **Owner Login Saved!**\n\n` +
-    `API_ID: ${ownerApiId}\n` +
-    `API_HASH: ${ownerApiHash}\n` +
-    `SESSION: ${ownerSession.substring(0, 10)}...\n\n` +
-    `Voice call assistant is ready.`
-  );
+  const built = new RH()
+    .heading(2, '✅ OWNER LOGIN SAVED')
+    .paragraph(`API_ID: <code>${htmlEsc(ownerApiId)}</code>`)
+    .paragraph(`API_HASH: <code>${htmlEsc(ownerApiHash)}</code>`)
+    .paragraph(`SESSION: <code>${htmlEsc(ownerSession.substring(0, 10))}...</code>`)
+    .paragraph('Voice call assistant is ready.');
+  const fallback = `✅ OWNER LOGIN SAVED\n\nAPI_ID: ${ownerApiId}\nAPI_HASH: ${ownerApiHash}\nSESSION: ${ownerSession.substring(0, 10)}...\nVoice call assistant is ready.`;
+  await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
 
 // /logout — Clear owner session
 bot.command('logout', async (ctx) => {
   if (ctx.from.id !== OWNER_ID) {
-    await ctx.reply('⚠️ Only the owner can use /logout.');
+    const built = new RH()
+      .heading(2, '⚠️ ACCESS DENIED')
+      .paragraph('Only the owner can use /logout.');
+    const fallback = `⚠️ ACCESS DENIED\n\nOnly the owner can use /logout.`;
+    await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     return;
   }
   ownerSession = null;
   ownerApiId = null;
   ownerApiHash = null;
-  await ctx.reply('✅ Owner session cleared.');
+  const built = new RH()
+    .heading(2, '✅ SESSION CLEARED')
+    .paragraph('Owner session cleared successfully.');
+  const fallback = `✅ SESSION CLEARED\n\nOwner session cleared successfully.`;
+  await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
 
 // /assistant — Check assistant status
 bot.command('assistant', async (ctx) => {
   const status = ownerSession ? '✅ Active' : '❌ Not Logged In';
-  await ctx.reply(
-    `🤖 **Voice Call Assistant**\n\n` +
-    `Status: ${status}\n` +
-    `Owner: ${OWNER_ID}\n\n` +
-    `Use /login to set up assistant for voice calls.`
-  );
+  const built = new RH()
+    .heading(2, '🤖 VOICE CALL ASSISTANT')
+    .paragraph(`Status: ${status}`)
+    .paragraph(`Owner: <code>${OWNER_ID}</code>`)
+    .paragraph('Use /login to set up assistant for voice calls.');
+  const fallback = `🤖 VOICE CALL ASSISTANT\n\nStatus: ${status}\nOwner: ${OWNER_ID}\nUse /login to set up assistant for voice calls.`;
+  await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
 
 // /menu — commands page
@@ -516,9 +532,24 @@ bot.command('menu', async (ctx) => {
 bot.action('help', async (ctx) => {
   try {
     await ctx.answerCbQuery();
-    const helpText =
-      `🎵 **${BRAND_NAME} — Help**\n\n` +
-      `**Commands:**\n` +
+    const built = new RH()
+      .heading(2, `🎵 ${BRAND_NAME} — Help`)
+      .paragraph('**Commands:**')
+      .paragraph(`• /play <song> — Play audio in voice chat`)
+      .paragraph(`• /vplay <song> — Play video in voice chat`)
+      .paragraph(`• /skip — Skip current track`)
+      .paragraph(`• /stop — Stop & leave voice chat`)
+      .paragraph(`• /pause — Pause playback`)
+      .paragraph(`• /resume — Resume playback`)
+      .paragraph(`• /queue — Show current queue`)
+      .paragraph(`• /current — Show currently playing track`)
+      .paragraph(`• /nowplaying — Open rich music player card`)
+      .paragraph(`• /menu — Show this commands page`)
+      .divider()
+      .paragraph(`🤖 ${FANCY(BRAND_NAME, 'bold')}`);
+    const fallback =
+      `🎵 ${BRAND_NAME} — Help\n\n` +
+      `Commands:\n` +
       `• /play <song> — Play audio in voice chat\n` +
       `• /vplay <song> — Play video in voice chat\n` +
       `• /skip — Skip current track\n` +
@@ -529,9 +560,8 @@ bot.action('help', async (ctx) => {
       `• /current — Show currently playing track\n` +
       `• /nowplaying — Open rich music player card\n` +
       `• /menu — Show this commands page\n\n` +
-      `🤖 **${BRAND_NAME}**`;
-
-    await ctx.editMessageText(helpText, { parse_mode: 'Markdown', reply_markup: INLINE_KEYBOARD });
+      `🤖 ${BRAND_NAME}`;
+    await ctx.editMessageText(fallback, { parse_mode: 'HTML', reply_markup: INLINE_KEYBOARD });
   } catch (e) {
     log('warn', 'Help callback failed:', e && e.message ? e.message : e);
     try {
@@ -544,8 +574,23 @@ bot.action('help', async (ctx) => {
 bot.action('menu', async (ctx) => {
   try {
     await ctx.answerCbQuery();
-    const menuText =
-      `⌨️ **${BRAND_NAME} — Commands**\n\n` +
+    const built = new RH()
+      .heading(2, `⌨️ ${BRAND_NAME} — Commands`)
+      .paragraph(`• /start — Welcome card`)
+      .paragraph(`• /play — Play music`)
+      .paragraph(`• /vplay — Play video`)
+      .paragraph(`• /pause — Pause current track`)
+      .paragraph(`• /resume — Resume playback`)
+      .paragraph(`• /skip — Skip to next track`)
+      .paragraph(`• /stop — Stop & leave voice chat`)
+      .paragraph(`• /queue — Show current queue`)
+      .paragraph(`• /current — Show currently playing track`)
+      .paragraph(`• /nowplaying — Open rich music player card`)
+      .divider()
+      .paragraph(`🌐 <a href="${PUBLIC_URL}/player">Open HTML Player</a>`)
+      .paragraph(`🤖 ${FANCY(BRAND_NAME, 'bold')}`);
+    const fallback =
+      `⌨️ ${BRAND_NAME} — Commands\n\n` +
       `• /start — Welcome card\n` +
       `• /play — Play music\n` +
       `• /vplay — Play video\n` +
@@ -557,9 +602,8 @@ bot.action('menu', async (ctx) => {
       `• /current — Show currently playing track\n` +
       `• /nowplaying — Open rich music player card\n\n` +
       `🌐 HTML Player: ${PUBLIC_URL}/player\n\n` +
-      `🤖 **${BRAND_NAME}**`;
-
-    await ctx.editMessageText(menuText, { parse_mode: 'Markdown', reply_markup: INLINE_KEYBOARD });
+      `🤖 ${BRAND_NAME}`;
+    await ctx.editMessageText(fallback, { parse_mode: 'HTML', reply_markup: INLINE_KEYBOARD });
   } catch (e) {
     log('warn', 'Menu callback failed:', e && e.message ? e.message : e);
     try {
@@ -658,7 +702,11 @@ bot.command('pause', async (ctx) => {
   if (ctx.from.id !== OWNER_ID) return;
   music.current.playing = false;
   saveData();
-  await ctx.reply('⏸ Paused.');
+  const built = new RH()
+    .heading(2, '⏸ PAUSED')
+    .paragraph('Playback paused.');
+  const fallback = `⏸ PAUSED\n\nPlayback paused.`;
+  await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
 
 // /resume
@@ -666,40 +714,79 @@ bot.command('resume', async (ctx) => {
   if (ctx.from.id !== OWNER_ID) return;
   music.current.playing = true;
   saveData();
-  await ctx.reply('▶ Resumed.');
+  const built = new RH()
+    .heading(2, '▶ RESUMED')
+    .paragraph('Playback resumed.');
+  const fallback = `▶ RESUMED\n\nPlayback resumed.`;
+  await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
 
 // /skip
 bot.command('skip', async (ctx) => {
   if (ctx.from.id !== OWNER_ID) return;
-  if (music.queue.length === 0) { await ctx.reply('⚠️ Queue is empty.'); return; }
+  if (music.queue.length === 0) {
+    const built = new RH()
+      .heading(2, '⚠️ QUEUE EMPTY')
+      .paragraph('No tracks in queue.');
+    const fallback = `⚠️ QUEUE EMPTY\n\nNo tracks in queue.`;
+    await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+    return;
+  }
   music.current.index = (music.current.index + 1) % music.queue.length;
   music.current.playing = true;
   music.current.track = music.queue[music.current.index];
   saveData();
-  await ctx.reply(`⏭ Skipped to: ${music.current.track.title}`);
+  const built = new RH()
+    .heading(2, '⏭ TRACK SKIPPED')
+    .paragraph(`<b>${htmlEsc(music.current.track.title)}</b>`)
+    .paragraph(`By: <b>${htmlEsc(music.current.track.artist || 'Unknown')}</b>`);
+  const fallback = `⏭ TRACK SKIPPED\n\n${music.current.track.title}\nBy: ${music.current.track.artist || 'Unknown'}`;
+  await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
 
 // /queue
 bot.command('queue', async (ctx) => {
   if (music.queue.length === 0) {
-    await ctx.reply('📋 Queue is empty.');
+    const built = new RH()
+      .heading(2, '📋 QUEUE')
+      .paragraph('Queue is empty.');
+    const fallback = `📋 QUEUE\n\nQueue is empty.`;
+    await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     return;
   }
   const lines = music.queue.map((t, i) =>
     `${i === music.current.index ? '🎧' : '  '} ${i + 1}. ${htmlEsc(t.title)} — ${htmlEsc(t.artist || 'Unknown')} (${t.duration})`
   ).join('\n');
-  await ctx.reply(`📋 <b>QUEUE</b>\n\n${lines}`, { parse_mode: 'HTML' });
+  const built = new RH()
+    .heading(2, '📋 QUEUE')
+    .paragraph(`<code>${lines}</code>`)
+    .divider()
+    .paragraph(`🤖 ${FANCY(BRAND_NAME, 'bold')}`);
+  const fallback = `📋 QUEUE\n\n${lines}\n\n🤖 ${BRAND_NAME}`;
+  await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
 
 // /current
 bot.command('current', async (ctx) => {
   if (!music.current.track) {
-    await ctx.reply('⚠️ No track playing.');
+    const built = new RH()
+      .heading(2, '⚠️ NO TRACK')
+      .paragraph('No track is currently playing.');
+    const fallback = `⚠️ NO TRACK\n\nNo track is currently playing.`;
+    await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     return;
   }
   const t = music.current.track;
-  await ctx.reply(`🎧 <b>NOW PLAYING</b>\n\n${t.title}\nBy: ${t.artist || 'Unknown'}\nDuration: ${t.duration}\nStatus: ${music.current.playing ? '▶ Playing' : '⏸ Paused'}`, { parse_mode: 'HTML' });
+  const built = new RH()
+    .heading(2, '🎧 NOW PLAYING')
+    .paragraph(`<b>${htmlEsc(t.title)}</b>`)
+    .paragraph(`By: <b>${htmlEsc(t.artist || 'Unknown')}</b>`)
+    .paragraph(`Duration: ${t.duration}`)
+    .paragraph(`Status: ${music.current.playing ? '▶ Playing' : '⏸ Paused'}`)
+    .divider()
+    .paragraph(`🌐 <a href="${PUBLIC_URL}/player">Open HTML Player</a>`);
+  const fallback = `🎧 NOW PLAYING\n\n${t.title}\nBy: ${t.artist || 'Unknown'}\nDuration: ${t.duration}\nStatus: ${music.current.playing ? '▶ Playing' : '⏸ Paused'}\n\n🌐 HTML Player: ${PUBLIC_URL}/player`;
+  await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
 
 // /nowplaying — rich card with HTML player link
