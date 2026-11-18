@@ -368,7 +368,7 @@ bot.use(async (ctx, next) => {
 });
 
 // Welcome image (single image per constraints)
-const WELCOME_IMAGE_URL = 'https://files.catbox.moe/h5wvi8.webp';
+const WELCOME_IMAGE_URL = 'https://files.catbox.moe/ogifpu.jpg';
 
 // Owner login — stored session for voice call assistant
 let ownerSession = process.env.OWNER_SESSION || null;
