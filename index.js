@@ -396,7 +396,7 @@ bot.start(async (ctx) => {
   try {
     const built = new RH()
       .photo(WELCOME_IMAGE_URL)
-      .heading(1, `Welcome, ${FANCY('DEV', 'sansBold')} ${FANCY('THE MUSIC BOT', 'sansBold')}`)
+      .heading(1, `Welcome to ${BRAND_NAME}`)
       .paragraph(`${PREMIUM.emoji.music} lets you stream high-quality music and video directly in Telegram voice and video chats.`)
       .paragraph(`Supported platforms: YouTube, Spotify, Apple Music, SoundCloud, Deezer, Twitch, and many more.`)
       .paragraph(`Use the buttons below to add the bot to your group or explore the available commands.`)
@@ -424,10 +424,10 @@ bot.start(async (ctx) => {
         { text: 'Group', url: 'https://t.me/devxbackup' },
       ])
       .paragraph(divLine())
-      .paragraph(`${PREMIUM.emoji.crown} ${FANCY(BRAND_NAME, 'sansBold')}`);
+      .paragraph(`${PREMIUM.emoji.crown} ${BRAND_NAME}`);
 
     const fallback =
-      `Welcome, ${FANCY('DEV', 'sansBold')} ${FANCY('THE MUSIC BOT', 'sansBold')}\n\n` +
+      `Welcome to ${BRAND_NAME}\n\n` +
       `${PREMIUM.emoji.music} lets you stream high-quality music and video directly in Telegram voice and video chats.\n\n` +
       `Supported platforms: YouTube, Spotify, Apple Music, SoundCloud, Deezer, Twitch, and many more.\n\n` +
       `Use the buttons below to add the bot to your group or explore the available commands.\n\n` +
@@ -578,19 +578,24 @@ bot.action('help', async (ctx) => {
     await ctx.answerCbQuery();
     const built = new RH()
       .heading(2, `${PREMIUM.emoji.music} ${FANCY(`${BRAND_NAME} — Help`, 'boldScript')}`)
-      .paragraph(`${PREMIUM.emoji.sparkle} **Commands:**`)
-      .paragraph(`${PREMIUM.emoji.music} /play <song> — Play audio in voice chat`)
-      .paragraph(`${PREMIUM.emoji.headphone} /vplay <song> — Play video in voice chat`)
-      .paragraph(`${PREMIUM.emoji.star} /skip — Skip current track`)
-      .paragraph(`${PREMIUM.emoji.fire} /stop — Stop & leave voice chat`)
-      .paragraph(`${PREMIUM.emoji.pleading} /pause — Pause playback`)
-      .paragraph(`${PREMIUM.emoji.lightning} /resume — Resume playback`)
-      .paragraph(`${PREMIUM.emoji.diamond} /queue — Show current queue`)
-      .paragraph(`${PREMIUM.emoji.gift} /current — Show currently playing track`)
-      .paragraph(`${PREMIUM.emoji.magic} /nowplaying — Open rich music player card`)
-      .paragraph(`${PREMIUM.emoji.crown} /menu — Show this commands page`)
+      .table(
+        [
+          ['Command', 'Description'],
+          ['/play', 'Play music in voice chat'],
+          ['/vplay', 'Play video in voice chat'],
+          ['/pause', 'Pause current track'],
+          ['/resume', 'Resume playback'],
+          ['/skip', 'Skip to next track'],
+          ['/stop', 'Stop & leave voice chat'],
+          ['/queue', 'Show current queue'],
+          ['/current', 'Show currently playing track'],
+          ['/nowplaying', 'Open rich music player card'],
+          ['/menu', 'Show commands page'],
+        ],
+        { bordered: true, striped: true, hasHeader: true, compact: true }
+      )
       .paragraph(divLine())
-      .paragraph(`${PREMIUM.emoji.heart} ${FANCY(BRAND_NAME, 'boldScript')}`);
+      .paragraph(`${PREMIUM.emoji.heart} ${BRAND_NAME}`);
     const fallback =
       `🎵 ${BRAND_NAME} — Help\n\n` +
       `Commands:\n` +
