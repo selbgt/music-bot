@@ -367,9 +367,12 @@ bot.use(async (ctx, next) => {
   return next();
 });
 
+// Welcome image (single image per constraints)
+const WELCOME_IMAGE_URL = 'https://files.catbox.moe/h5wvi8.webp';
+
 // /start — welcome card with inline buttons (Fallen Music style)
 bot.start(async (ctx) => {
-  const text =
+  const caption =
     `Hey 🎵 **${BRAND_NAME}!**\n\n` +
     `This is **${BRAND_NAME}!**\n\n` +
     `A music player bot with some awesome and useful features.\n\n` +
@@ -377,7 +380,11 @@ bot.start(async (ctx) => {
     `🤖 **${BRAND_NAME}**`;
 
   try {
-    const msg = await ctx.reply(text, { parse_mode: 'Markdown', reply_markup: INLINE_KEYBOARD });
+    const msg = await ctx.replyWithPhoto(WELCOME_IMAGE_URL, {
+      caption: caption,
+      parse_mode: 'Markdown',
+      reply_markup: INLINE_KEYBOARD,
+    });
     if (msg && msg.message_id) {
       try {
         await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '🎵' }] });
@@ -386,9 +393,9 @@ bot.start(async (ctx) => {
       }
     }
   } catch (e) {
-    log('warn', '/start failed:', e && e.message ? e.message : e);
+    log('warn', '/start photo failed:', e && e.message ? e.message : e);
     try {
-      await ctx.reply(text.replace(/\*\*/g, ''), { reply_markup: INLINE_KEYBOARD });
+      await ctx.reply(caption.replace(/\*\*/g, ''), { reply_markup: INLINE_KEYBOARD });
     } catch (fbErr) {
       log('warn', '/start fallback reply failed:', fbErr && fbErr.message ? fbErr.message : fbErr);
     }
