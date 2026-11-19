@@ -67,45 +67,32 @@ if (!OWNER_ID) { console.error('❌ Missing OWNER_ID'); process.exit(1); }
 
 fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
 
-// ════════════════════════════════════════════════════════════════════
-//  PERSISTENT SESSION STORAGE (GitHub-safe)
-// ════════════════════════════════════════════════════════════════════
-const SESSIONS_FILE = path.join(__dirname, 'sessions.json');
-
-// Load saved sessions from file (survives bot restarts)
-function loadSessions() {
-  try {
-    if (!fs.existsSync(SESSIONS_FILE)) return {};
-    const raw = fs.readFileSync(SESSIONS_FILE, 'utf8');
-    return JSON.parse(raw);
-  } catch (e) {
-    log('warn', 'Failed to load sessions file:', e.message);
-    return {};
-  }
-}
-
-// Save sessions to file
-function saveSessions(sessions) {
-  try {
-    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessions, null, 2));
-    log('success', 'Sessions saved to sessions.json');
-  } catch (e) {
-    log('error', 'Failed to save sessions:', e.message);
-  }
-}
-
-const SESSIONS = loadSessions();
-
-// Restore owner session from saved file on startup
-if (SESSIONS.owner) {
-  ownerApiId = SESSIONS.owner.apiId || null;
-  ownerApiHash = SESSIONS.owner.apiHash || null;
-  ownerSession = SESSIONS.owner.sessionString || null;
-  log('success', 'Owner session restored from sessions.json');
-}
-
 const START_TS = Date.now();
 const DIVIDER = '⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯';
+
+// ════════════════════════════════════════════════════════════════════
+//  AUTH SYSTEM — Same as Python Dev X Music bot (/auth <user_id>)
+// ════════════════════════════════════════════════════════════════════
+
+function isAuth(userId, chatId) {
+  // Owner is always authorized
+  if (userId === OWNER_ID) return true;
+  const chatAuth = music.authorizedUsers || {};
+  const users = chatAuth[String(chatId)] || [];
+  return users.includes(userId);
+}
+
+function addAuth(userId, chatId) {
+  if (!music.authorizedUsers) music.authorizedUsers = {};
+  if (!music.authorizedUsers[String(chatId)]) music.authorizedUsers[String(chatId)] = [];
+  if (!music.authorizedUsers[String(chatId)].includes(userId)) {
+    music.authorizedUsers[String(chatId)].push(userId);
+  }
+  saveData();
+}
+
+// ════════════════════════════════════════════════════════════════════
+
 
 // Inline keyboard — Only ONE button outside card: Add Me To Group 🎶‼️
 // Rest of buttons go inside Telekaf table (card)
@@ -177,43 +164,6 @@ const PREMIUM = {
 const divLine = () => `${PREMIUM.emoji.sparkle} ${PREMIUM.separator} ${PREMIUM.emoji.sparkle}`;
 
 // ══════════════════════════════════════════════════════════════
-//  PHONE-BASED LOGIN SYSTEM (OTP + Password flow)
-// ══════════════════════════════════════════════════════════════
-
-// Login states
-const LOGIN_STATES = {
-  WAITING_FOR_PHONE: 'WAITING_FOR_PHONE',
-  WAITING_FOR_OTP: 'WAITING_FOR_OTP',
-  WAITING_FOR_PASSWORD: 'WAITING_FOR_PASSWORD',
-};
-
-// Track users in login flow: { userId: { state, phone, otp, code, passwordAttempts } }
-const loginSessions = new Map();
-
-// Cleanup old login sessions after 10 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [userId, session] of loginSessions.entries()) {
-    if (now - session.timestamp > 600000) {
-      loginSessions.delete(userId);
-    }
-  }
-}, 300000);
-
-// Helper: check if user is in login flow
-function isInLoginFlow(userId) {
-  return loginSessions.has(userId);
-}
-
-// Helper: get user's login session
-function getLoginSession(userId) {
-  return loginSessions.get(userId);
-}
-
-// Helper: clear user's login session
-function clearLoginSession(userId) {
-  loginSessions.delete(userId);
-}
 
 // ══════════════════════════════════════════════════════════════
 
@@ -628,154 +578,6 @@ bot.use(async (ctx, next) => {
 });
 
 // Middleware: Phone-based login flow handler
-bot.use(async (ctx, next) => {
-  const msg = ctx.message;
-  const userId = ctx.from?.id;
-
-  // Skip if no message or not from a user
-  if (!msg || !userId || msg.from?.is_bot) {
-    return next();
-  }
-
-  // Skip command messages (let command handlers process them)
-  if (msg.text && msg.text.startsWith('/')) {
-    return next();
-  }
-
-  // If user is in login flow, handle based on state
-  if (isInLoginFlow(userId)) {
-    const session = getLoginSession(userId);
-    const text = msg.text.trim();
-
-    if (session.state === LOGIN_STATES.WAITING_FOR_PHONE) {
-      // Validate phone number format
-      const phoneRegex = /^\+?[1-9]\d{1,14}$/;
-      if (!phoneRegex.test(text)) {
-        const built = new RH()
-          .heading(2, `${PREMIUM.emoji.fire} INVALID PHONE`)
-          .paragraph(`${PREMIUM.emoji.sparkle} Please send a valid phone number:`)
-          .paragraph(`${PREMIUM.emoji.diamond} Example: +919876543210`)
-          .paragraph(`${PREMIUM.emoji.diamond} Include country code (e.g. +91 for India)`)
-          .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
-          .paragraph(divLine());
-        const fallback = `⚠️ INVALID PHONE\n\n✨ Please send a valid phone number:\n💎 Example: +919876543210\n💎 Include country code (e.g. +91 for India)\n🪄 Send /cancel to abort.`;
-        await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
-        return;
-      }
-
-      // Save phone and move to OTP step
-      session.phone = text;
-      session.state = LOGIN_STATES.WAITING_FOR_OTP;
-      session.timestamp = Date.now();
-      loginSessions.set(userId, session);
-
-      // Simulate sending OTP (in production, integrate with SMS API like Twilio)
-      const mockOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      session.otp = mockOtp;
-      loginSessions.set(userId, session);
-
-      const built = new RH()
-        .heading(2, `${PREMIUM.emoji.magic} OTP SENT`)
-        .paragraph(`${PREMIUM.emoji.sparkle} OTP sent to ${text}`)
-        .paragraph(`${PREMIUM.emoji.diamond} Your OTP: <code>${mockOtp}</code>`)
-        .paragraph(`${PREMIUM.emoji.diamond} Enter the 6-digit OTP you received:`)
-        .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
-        .paragraph(divLine());
-      const fallback = `🪄 OTP SENT\n\n✨ OTP sent to ${text}\n💎 Your OTP: ${mockOtp}\n💎 Enter the 6-digit OTP you received:\n🪄 Send /cancel to abort.`;
-      await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
-      return;
-    }
-
-    if (session.state === LOGIN_STATES.WAITING_FOR_OTP) {
-      // Validate OTP (6 digits)
-      const otpRegex = /^\d{6}$/;
-      if (!otpRegex.test(text)) {
-        const built = new RH()
-          .heading(2, `${PREMIUM.emoji.fire} INVALID OTP`)
-          .paragraph(`${PREMIUM.emoji.sparkle} Please enter a valid 6-digit OTP:`)
-          .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
-          .paragraph(divLine());
-        const fallback = `⚠️ INVALID OTP\n\n✨ Please enter a valid 6-digit OTP:\n🪄 Send /cancel to abort.`;
-        await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
-        return;
-      }
-
-      // Verify OTP (in production, verify with SMS provider)
-      if (text !== session.otp) {
-        const built = new RH()
-          .heading(2, `${PREMIUM.emoji.fire} WRONG OTP`)
-          .paragraph(`${PREMIUM.emoji.sparkle} The OTP you entered is incorrect.`)
-          .paragraph(`${PREMIUM.emoji.diamond} Your OTP was: <code>${session.otp}</code>`)
-          .paragraph(`${PREMIUM.emoji.diamond} Please try again:`)
-          .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
-          .paragraph(divLine());
-        const fallback = `⚠️ WRONG OTP\n\n✨ The OTP you entered is incorrect.\n💎 Your OTP was: ${session.otp}\n💎 Please try again:\n🪄 Send /cancel to abort.`;
-        await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
-        return;
-      }
-
-      // OTP verified — check if 2FA password is needed (simulated)
-      session.state = LOGIN_STATES.WAITING_FOR_PASSWORD;
-      session.timestamp = Date.now();
-      loginSessions.set(userId, session);
-
-      const built = new RH()
-        .heading(2, `${PREMIUM.emoji.diamond} OTP VERIFIED`)
-        .paragraph(`${PREMIUM.emoji.sparkle} OTP verified successfully!`)
-        .paragraph(`${PREMIUM.emoji.diamond} Enter your account password (2FA):`)
-        .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
-        .paragraph(divLine());
-      const fallback = `💎 OTP VERIFIED\n\n✨ OTP verified successfully!\n💎 Enter your account password (2FA):\n🪄 Send /cancel to abort.`;
-      await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
-      return;
-    }
-
-    if (session.state === LOGIN_STATES.WAITING_FOR_PASSWORD) {
-      // In production, verify password with auth provider
-      // For now, accept any non-empty password as "correct"
-      if (!text || text.length < 1) {
-        const built = new RH()
-          .heading(2, `${PREMIUM.emoji.fire} INVALID PASSWORD`)
-          .paragraph(`${PREMIUM.emoji.sparkle} Please enter a valid password:`)
-          .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
-          .paragraph(divLine());
-        const fallback = `⚠️ INVALID PASSWORD\n\n✨ Please enter a valid password:\n🪄 Send /cancel to abort.`;
-        await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
-        return;
-      }
-
-      // Login complete!
-      session.password = text;
-      session.state = 'LOGGED_IN';
-      session.timestamp = Date.now();
-      loginSessions.set(userId, session);
-
-      // Save session persistently to sessions.json (survives bot restarts)
-      SESSIONS.owner = {
-        apiId: ownerApiId || 'saved',
-        apiHash: ownerApiHash || 'saved',
-        sessionString: session.password || text,
-        phone: session.phone,
-        loggedInAt: new Date().toISOString(),
-      };
-      saveSessions(SESSIONS);
-
-      const built = new RH()
-        .heading(2, `${PREMIUM.emoji.gift} LOGIN SUCCESSFUL`)
-        .paragraph(`${PREMIUM.emoji.sparkle} Welcome! You are now logged in.`)
-        .paragraph(`${PREMIUM.emoji.diamond} Phone: ${session.phone}`)
-        .paragraph(`${PREMIUM.emoji.diamond} Session saved — will auto-reconnect on restart`)
-        .paragraph(`${PREMIUM.emoji.magic} You can now use all bot features.`)
-        .paragraph(divLine());
-      const fallback = `✅ LOGIN SUCCESSFUL\n\n✨ Welcome! You are now logged in.\n💎 Phone: ${session.phone}\n💎 Session saved — will auto-reconnect on restart\n🪄 You can now use all bot features.`;
-      await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: true });
-      clearLoginSession(userId);
-      return;
-    }
-  }
-
-  return next();
-});
 
 // Welcome image (single image per constraints)
 const WELCOME_IMAGE_URL = 'https://files.catbox.moe/ogifpu.jpg';
@@ -903,64 +705,38 @@ bot.start(async (ctx) => {
 });
 
 // /login — Owner login for voice call assistant
-// /login — Phone-based login system (OTP + Password)
-bot.command('login', async (ctx) => {
-  const userId = ctx.from.id;
-
-  // If already in login flow, show current state
-  if (isInLoginFlow(userId)) {
-    const session = getLoginSession(userId);
+// /auth — Authorize user in group (owner only) — Same as Python Dev X Music bot
+bot.command('auth', async (ctx) => {
+  if (ctx.from.id !== OWNER_ID) {
     const built = new RH()
-      .heading(2, `${PREMIUM.emoji.fire} ALREADY IN LOGIN`)
-      .paragraph(`${PREMIUM.emoji.sparkle} You are already in login process.`)
-      .paragraph(`${PREMIUM.emoji.diamond} Current step: ${session.state}`)
-      .paragraph(`${PREMIUM.emoji.diamond} Phone: ${session.phone || 'Not provided yet'}`)
-      .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort and start over.`)
+      .heading(2, `${PREMIUM.emoji.fire} ACCESS DENIED`)
+      .paragraph(`${PREMIUM.emoji.sparkle} Only the owner can authorize users.`)
       .paragraph(divLine());
-    const fallback = `⚠️ ALREADY IN LOGIN\n\nYou are already in login process.\nCurrent step: ${session.state}\nPhone: ${session.phone || 'Not provided yet'}\nSend /cancel to abort and start over.`;
+    const fallback = `⚠️ ACCESS DENIED\n\nOnly the owner can authorize users.`;
     await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     return;
   }
-
-  // Start login flow — ask for phone number
-  loginSessions.set(userId, {
-    state: LOGIN_STATES.WAITING_FOR_PHONE,
-    timestamp: Date.now(),
-  });
-
-  const built = new RH()
-    .heading(2, `${PREMIUM.emoji.music} PHONE LOGIN`)
-    .paragraph(`${PREMIUM.emoji.sparkle} Send your phone number to login:`)
-    .paragraph(`${PREMIUM.emoji.diamond} Example: +919876543210`)
-    .paragraph(`${PREMIUM.emoji.diamond} Include country code (e.g. +91 for India)`)
-    .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort anytime.`)
-    .paragraph(divLine());
-  const fallback = `🎵 PHONE LOGIN\n\n✨ Send your phone number to login:\n💎 Example: +919876543210\n💎 Include country code (e.g. +91 for India)\n🪄 Send /cancel to abort anytime.`;
-  await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
-});
-
-// /cancel — Abort login flow
-bot.command('cancel', async (ctx) => {
-  const userId = ctx.from.id;
-  if (!isInLoginFlow(userId)) {
+  const parts = ctx.message.text.split(/\s+/).slice(1);
+  if (parts.length < 1) {
     const built = new RH()
-      .heading(2, `${PREMIUM.emoji.fire} NOT IN LOGIN`)
-      .paragraph(`${PREMIUM.emoji.sparkle} You are not in any login process.`)
+      .heading(2, `${PREMIUM.emoji.fire} USAGE`)
+      .paragraph(`${PREMIUM.emoji.sparkle} Send: <code>/auth <user_id></code>`)
+      .paragraph(`${PREMIUM.emoji.diamond} Authorize a user to use music commands in this group`)
       .paragraph(divLine());
-    const fallback = `⚠️ NOT IN LOGIN\n\nYou are not in any login process.`;
+    const fallback = `❌ USAGE\n\nSend: /auth <user_id>\nAuthorize a user to use music commands in this group.`;
     await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     return;
   }
-  clearLoginSession(userId);
-  // Clear saved persistent session
-  delete SESSIONS.owner;
-  saveSessions(SESSIONS);
+  const targetId = Number(parts[0]);
+  const chatId = ctx.chat.id;
+  addAuth(targetId, chatId);
   const built = new RH()
-    .heading(2, `${PREMIUM.emoji.gift} LOGIN CANCELLED`)
-    .paragraph(`${PREMIUM.emoji.sparkle} Login process has been cancelled.`)
-    .paragraph(`${PREMIUM.emoji.magic} Send /login to start again.`)
+    .heading(2, `${PREMIUM.emoji.gift} USER AUTHORIZED`)
+    .paragraph(`${PREMIUM.emoji.sparkle} User <code>${targetId}</code> is now authorized in this group.`)
+    .paragraph(`${PREMIUM.emoji.diamond} Chat ID: <code>${chatId}</code>`)
+    .paragraph(`${PREMIUM.emoji.magic} They can now use music commands.`)
     .paragraph(divLine());
-  const fallback = `✅ LOGIN CANCELLED\n\n✨ Login process has been cancelled.\n🪄 Send /login to start again.`;
+  const fallback = `✅ USER AUTHORIZED\n\n✨ User ${targetId} is now authorized in this group.\n💎 Chat ID: ${chatId}\n🪄 They can now use music commands.`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
 
@@ -978,15 +754,11 @@ bot.command('logout', async (ctx) => {
   ownerSession = null;
   ownerApiId = null;
   ownerApiHash = null;
-  // Clear saved persistent session
-  delete SESSIONS.owner;
-  saveSessions(SESSIONS);
   const built = new RH()
     .heading(2, `${PREMIUM.emoji.gift} SESSION CLEARED`)
     .paragraph(`${PREMIUM.emoji.sparkle} Owner session cleared successfully.`)
-    .paragraph(`${PREMIUM.emoji.magic} Session removed from storage — bot will not auto-reconnect`)
     .paragraph(divLine());
-  const fallback = `✅ SESSION CLEARED\n\n✨ Owner session cleared successfully.\n🪄 Session removed from storage — bot will not auto-reconnect`;
+  const fallback = `✅ SESSION CLEARED\n\n✨ Owner session cleared successfully.`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
 
@@ -1145,7 +917,7 @@ bot.action('menu', async (ctx) => {
 
 // /play — search yt-dlp and send audio
 bot.command('play', async (ctx) => {
-  if (ctx.from.id !== OWNER_ID) {
+  if (!isAuth(ctx.from.id, ctx.chat.id)) {
     const built = new RH()
       .heading(2, `${PREMIUM.emoji.fire} ACCESS DENIED`)
       .paragraph(`${PREMIUM.emoji.sparkle} Only the owner can add music.`)
@@ -1244,7 +1016,7 @@ bot.command('play', async (ctx) => {
 
 // /pause
 bot.command('pause', async (ctx) => {
-  if (ctx.from.id !== OWNER_ID) return;
+  if (!isAuth(ctx.from.id, ctx.chat.id)) return;
   music.current.playing = false;
   saveData();
   const built = new RH()
@@ -1257,7 +1029,7 @@ bot.command('pause', async (ctx) => {
 
 // /resume
 bot.command('resume', async (ctx) => {
-  if (ctx.from.id !== OWNER_ID) return;
+  if (!isAuth(ctx.from.id, ctx.chat.id)) return;
   music.current.playing = true;
   saveData();
   const built = new RH()
@@ -1270,7 +1042,7 @@ bot.command('resume', async (ctx) => {
 
 // /skip
 bot.command('skip', async (ctx) => {
-  if (ctx.from.id !== OWNER_ID) return;
+  if (!isAuth(ctx.from.id, ctx.chat.id)) return;
   if (music.queue.length === 0) {
     const built = new RH()
       .heading(2, `${PREMIUM.emoji.fire} QUEUE EMPTY`)
