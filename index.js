@@ -599,11 +599,11 @@ bot.start(async (ctx) => {
           log('warn', 'Welcome card reaction failed (group):', errMsg);
         }
       }
-      // Super reaction on user's /start command message
+      // Super reaction on user's /start command message (is_big = true for big reaction)
       try {
         if (ctx.message && ctx.message.message_id) {
-          await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
-          log('success', '💋 reaction on /start user message (group)');
+          await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }], is_big: true });
+          log('success', '💋 super reaction on /start user message (group)');
         } else {
           log('warn', 'No ctx.message.message_id available (group)');
         }
@@ -647,11 +647,11 @@ bot.start(async (ctx) => {
           log('warn', 'Welcome card reaction failed (private):', errMsg);
         }
       }
-    // Super reaction on user's /start command message
+    // Super reaction on user's /start command message (is_big = true for big reaction)
     try {
       if (ctx.message && ctx.message.message_id) {
-        await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
-        log('success', '💋 reaction on /start user message (private)');
+        await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }], is_big: true });
+        log('success', '💋 super reaction on /start user message (private)');
       } else {
         log('warn', 'No ctx.message.message_id available (private)');
       }
@@ -1187,11 +1187,11 @@ bot.command('wrapped', async (ctx) => {
       log('warn', 'Welcome card reaction failed (/wrapped):', errMsg);
     }
   }
-  // Super reaction on user's /wrapped command message
+  // Super reaction on user's /wrapped command message (is_big = true for big reaction)
   try {
     if (ctx.message && ctx.message.message_id) {
-      await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
-      log('success', '💋 reaction on /wrapped user message');
+      await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }], is_big: true });
+      log('success', '💋 super reaction on /wrapped user message');
     } else {
       log('warn', 'No ctx.message.message_id available (/wrapped)');
     }
