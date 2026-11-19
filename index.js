@@ -394,9 +394,52 @@ let ownerSession = process.env.OWNER_SESSION || null;
 let ownerApiId = process.env.OWNER_API_ID || null;
 let ownerApiHash = process.env.OWNER_API_HASH || null;
 
-// /start — Telekaf rich welcome card (Fallen Music style)
+// /start — Telekaf rich welcome card (private) + group start card with uptime
 bot.start(async (ctx) => {
   try {
+    const isGroup = ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup');
+    const runtime = getRuntime();
+
+    if (isGroup) {
+      // Group start card — uptime + status + commands preview
+      const built = new RH()
+        .photo(WELCOME_IMAGE_URL)
+        .heading(1, `👑 ${BRAND_NAME} — Group Active`)
+        .paragraph(`${PREMIUM.emoji.sparkle} Bot is running in this group!`)
+        .paragraph(`${PREMIUM.emoji.diamond} Uptime: <code>${runtime}</code>`)
+        .paragraph(`${PREMIUM.emoji.diamond} Status: <code>● ONLINE</code>`)
+        .paragraph(`${PREMIUM.emoji.music} Use /play <song> to play music in voice chat`)
+        .paragraph(`${PREMIUM.emoji.headphone} Use /vplay <song> to play video in voice chat`)
+        .paragraph(divLine())
+        .buttonRow([
+          { text: 'Help', callback_data: 'help' },
+          { text: 'Updates', url: 'https://t.me/devxbackup' },
+          { text: 'Group', url: 'https://t.me/devxbackup' },
+        ])
+        .paragraph(divLine())
+        .paragraph(`👑 ${BRAND_NAME}`);
+
+      const fallback =
+        `👑 ${BRAND_NAME} — Group Active\n\n` +
+        `${PREMIUM.emoji.sparkle} Bot is running in this group!\n` +
+        `${PREMIUM.emoji.diamond} Uptime: ${runtime}\n` +
+        `${PREMIUM.emoji.diamond} Status: ● ONLINE\n\n` +
+        `${PREMIUM.emoji.music} /play <song> — Play music in voice chat\n` +
+        `${PREMIUM.emoji.headphone} /vplay <song> — Play video in voice chat\n\n` +
+        `👑 ${BRAND_NAME}`;
+
+      const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, { reply_markup: INLINE_KEYBOARD }, { celebration: true });
+      if (msg && msg.message_id) {
+        try {
+          await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '🎵' }] });
+        } catch (reErr) {
+          log('warn', 'Reaction failed for /start (group):', reErr && reErr.message ? reErr.message : reErr);
+        }
+      }
+      return;
+    }
+
+    // Private welcome card
     const built = new RH()
       .photo(WELCOME_IMAGE_URL)
       .heading(1, `Welcome to ${BRAND_NAME}`)
@@ -558,11 +601,12 @@ bot.command('menu', async (ctx) => {
   }
 });
 
-// Inline button: Help callback
+// Inline button: Help callback — shows Telekaf HTML rich card menu
 bot.action('help', async (ctx) => {
   try {
     await ctx.answerCbQuery();
     const built = new RH()
+      .photo(WELCOME_IMAGE_URL)
       .heading(2, `${PREMIUM.emoji.music} ${BRAND_NAME} — Help`)
       .table(
         [
@@ -596,7 +640,7 @@ bot.action('help', async (ctx) => {
       `• /nowplaying — Open rich music player card\n` +
       `• /menu — Show this commands page\n\n` +
       `🤖 ${BRAND_NAME}`;
-    await ctx.editMessageText(fallback, { parse_mode: 'HTML', reply_markup: INLINE_KEYBOARD });
+    await sendRichCard(ctx, ctx.chat.id, built, fallback, { reply_markup: INLINE_KEYBOARD }, { celebration: false });
   } catch (e) {
     log('warn', 'Help callback failed:', e && e.message ? e.message : e);
     try {
@@ -605,11 +649,12 @@ bot.action('help', async (ctx) => {
   }
 });
 
-// Inline button: Menu callback
+// Inline button: Menu callback — shows Telekaf HTML rich card
 bot.action('menu', async (ctx) => {
   try {
     await ctx.answerCbQuery();
     const built = new RH()
+      .photo(WELCOME_IMAGE_URL)
       .heading(2, `${PREMIUM.emoji.headphone} ${BRAND_NAME} — Commands`)
       .paragraph(`${PREMIUM.emoji.sparkle} /start — Welcome card`)
       .paragraph(`${PREMIUM.emoji.music} /play — Play music`)
@@ -638,7 +683,7 @@ bot.action('menu', async (ctx) => {
       `• /nowplaying — Open rich music player card\n\n` +
       `🌐 HTML Player: ${PUBLIC_URL}/player\n\n` +
       `🤖 ${BRAND_NAME}`;
-    await ctx.editMessageText(fallback, { parse_mode: 'HTML', reply_markup: INLINE_KEYBOARD });
+    await sendRichCard(ctx, ctx.chat.id, built, fallback, { reply_markup: INLINE_KEYBOARD }, { celebration: false });
   } catch (e) {
     log('warn', 'Menu callback failed:', e && e.message ? e.message : e);
     try {
