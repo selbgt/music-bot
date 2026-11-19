@@ -129,14 +129,23 @@ function clearLoginSession(userId) {
   loginSessions.delete(userId);
 }
 
-// Generate a fake session string (in production, this comes from Telegram API signIn)
-function generateSessionString() {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-  let result = '';
-  for (let i = 0; i < 256; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
+// Run Python login helper (Pyrogram) — real Telegram API
+function runPythonHelper(args) {
+  return new Promise((resolve, reject) => {
+    const python = process.env.PYTHON_PATH || 'python3';
+    const script = path.join(__dirname, 'login_helper.py');
+    execFile(python, script, args, { timeout: 60000, encoding: 'utf8' }, (error, stdout, stderr) => {
+      if (error) {
+        reject({ error: error.message, stderr: stderr ? stderr.toString() : '' });
+        return;
+      }
+      try {
+        resolve(JSON.parse(stdout.trim()));
+      } catch (e) {
+        reject({ error: 'Failed to parse Python output', raw: stdout.trim() });
+      }
+    });
+  });
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -664,21 +673,41 @@ bot.use(async (ctx, next) => {
       session.timestamp = Date.now();
       loginSessions.set(userId, session);
 
-      // Simulate sending OTP (in production, integrate with Telegram API / Twilio)
-      const mockOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      session.otp = mockOtp;
-      session.phoneCodeHash = 'mock_hash_' + Date.now();
-      loginSessions.set(userId, session);
+      // Send real OTP via Pyrogram (Telegram API)
+      try {
+        const result = await runPythonHelper(['send_code', text]);
+        if (result.error) {
+          const built = new RH()
+            .heading(2, `${PREMIUM.emoji.fire} OTP FAILED`)
+            .paragraph(`${PREMIUM.emoji.sparkle} Failed to send OTP: ${result.error}`)
+            .paragraph(`${PREMIUM.emoji.magic} Make sure LOGIN_API_ID and LOGIN_API_HASH are set`)
+            .paragraph(divLine());
+          const fallback = `⚠️ OTP FAILED\n\n✨ Failed to send OTP: ${result.error}\n🪄 Make sure LOGIN_API_ID and LOGIN_API_HASH are set`;
+          await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+          clearLoginSession(userId);
+          return;
+        }
+        session.phoneCodeHash = result.phone_code_hash || '';
+        loginSessions.set(userId, session);
+      } catch (e) {
+        const built = new RH()
+          .heading(2, `${PREMIUM.emoji.fire} OTP ERROR`)
+          .paragraph(`${PREMIUM.emoji.sparkle} Error sending OTP: ${e.message || e.error || String(e)}`)
+          .paragraph(divLine());
+        const fallback = `⚠️ OTP ERROR\n\n✨ Error sending OTP: ${e.message || e.error || String(e)}`;
+        await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+        clearLoginSession(userId);
+        return;
+      }
 
       const built = new RH()
         .heading(2, `${PREMIUM.emoji.magic} OTP SENT`)
-        .paragraph(`${PREMIUM.emoji.sparkle} OTP sent to ${text}`)
-        .paragraph(`${PREMIUM.emoji.diamond} The code will arrive via Telegram app/SMS.`)
-        .paragraph(`${PREMIUM.emoji.diamond} Your OTP: <code>${mockOtp}</code>`)
+        .paragraph(`${PREMIUM.emoji.sparkle} OTP sent to ${text} via Telegram`)
+        .paragraph(`${PREMIUM.emoji.diamond} Check your Telegram app for the login code`)
         .paragraph(`${PREMIUM.emoji.diamond} Enter the 6-digit OTP you received:`)
         .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
         .paragraph(divLine());
-      const fallback = `🪄 OTP SENT\n\n✨ OTP sent to ${text}\n💎 The code will arrive via Telegram app/SMS.\n💎 Your OTP: ${mockOtp}\n💎 Enter the 6-digit OTP you received:\n🪄 Send /cancel to abort.`;
+      const fallback = `🪄 OTP SENT\n\n✨ OTP sent to ${text} via Telegram\n💎 Check your Telegram app for the login code\n💎 Enter the 6-digit OTP you received:\n🪄 Send /cancel to abort.`;
       await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
       return;
     }
@@ -696,41 +725,54 @@ bot.use(async (ctx, next) => {
         return;
       }
 
-      if (text !== session.otp) {
+      // Verify OTP via Pyrogram (real Telegram API)
+      try {
+        const result = await runPythonHelper(['sign_in', session.phone, text]);
+        if (result.error) {
+          if (result.error === '2FA_PASSWORD_NEEDED') {
+            session.state = LOGIN_STATES.WAITING_FOR_PASSWORD;
+            session.timestamp = Date.now();
+            loginSessions.set(userId, session);
+
+            const built = new RH()
+              .heading(2, `${PREMIUM.emoji.diamond} 2FA PASSWORD`)
+              .paragraph(`${PREMIUM.emoji.sparkle} 2FA password is enabled!`)
+              .paragraph(`${PREMIUM.emoji.diamond} Send your Telegram 2FA password:`)
+              .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
+              .paragraph(divLine());
+            const fallback = `💎 2FA PASSWORD\n\n✨ 2FA password is enabled!\n💎 Send your Telegram 2FA password:\n🪄 Send /cancel to abort.`;
+            await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+            return;
+          }
+          const built = new RH()
+            .heading(2, `${PREMIUM.emoji.fire} INVALID OTP`)
+            .paragraph(`${PREMIUM.emoji.sparkle} ${result.message || result.error}`)
+            .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
+            .paragraph(divLine());
+          const fallback = `⚠️ INVALID OTP\n\n✨ ${result.message || result.error}\n🪄 Send /cancel to abort.`;
+          await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+          return;
+        }
+      } catch (e) {
         const built = new RH()
-          .heading(2, `${PREMIUM.emoji.fire} WRONG OTP`)
-          .paragraph(`${PREMIUM.emoji.sparkle} The OTP you entered is incorrect.`)
-          .paragraph(`${PREMIUM.emoji.diamond} Your OTP was: <code>${session.otp}</code>`)
-          .paragraph(`${PREMIUM.emoji.diamond} Please try again:`)
-          .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
+          .heading(2, `${PREMIUM.emoji.fire} OTP ERROR`)
+          .paragraph(`${PREMIUM.emoji.sparkle} Error verifying OTP: ${e.message || e.error || String(e)}`)
           .paragraph(divLine());
-        const fallback = `⚠️ WRONG OTP\n\n✨ The OTP you entered is incorrect.\n💎 Your OTP was: ${session.otp}\n💎 Please try again:\n🪄 Send /cancel to abort.`;
+        const fallback = `⚠️ OTP ERROR\n\n✨ Error verifying OTP: ${e.message || e.error || String(e)}`;
         await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
         return;
       }
 
-      // Check if 2FA is enabled (simulated - randomly enable for demo)
-      const has2FA = Math.random() > 0.5;
-      if (has2FA) {
-        session.state = LOGIN_STATES.WAITING_FOR_PASSWORD;
-        session.timestamp = Date.now();
-        loginSessions.set(userId, session);
-
-        const built = new RH()
-          .heading(2, `${PREMIUM.emoji.diamond} 2FA PASSWORD`)
-          .paragraph(`${PREMIUM.emoji.sparkle} 2FA password is enabled!`)
-          .paragraph(`${PREMIUM.emoji.diamond} Hint: my num`)
-          .paragraph(`${PREMIUM.emoji.diamond} Send your password:`)
-          .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
-          .paragraph(divLine());
-        const fallback = `💎 2FA PASSWORD\n\n✨ 2FA password is enabled!\n💎 Hint: my num\n💎 Send your password:\n🪄 Send /cancel to abort.`;
-        await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
-        return;
+      // Login complete (OTP verified, no 2FA needed)
+      try {
+        const sessionResult = await runPythonHelper(['get_session', session.phone]);
+        if (!sessionResult.error && sessionResult.session_string) {
+          session.sessionString = sessionResult.session_string;
+        }
+      } catch (e) {
+        // Session string not critical — continue anyway
       }
-
-      // Login complete (no 2FA)
       session.state = 'LOGGED_IN';
-      session.sessionString = generateSessionString();
       session.timestamp = Date.now();
       loginSessions.set(userId, session);
 
@@ -758,9 +800,39 @@ bot.use(async (ctx, next) => {
         return;
       }
 
-      session.password = text;
+      // Verify 2FA password via Pyrogram
+      try {
+        const result = await runPythonHelper(['sign_in_2fa', session.phone, text]);
+        if (result.error) {
+          const built = new RH()
+            .heading(2, `${PREMIUM.emoji.fire} WRONG PASSWORD`)
+            .paragraph(`${PREMIUM.emoji.sparkle} ${result.message || result.error}`)
+            .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
+            .paragraph(divLine());
+          const fallback = `⚠️ WRONG PASSWORD\n\n✨ ${result.message || result.error}\n🪄 Send /cancel to abort.`;
+          await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+          return;
+        }
+      } catch (e) {
+        const built = new RH()
+          .heading(2, `${PREMIUM.emoji.fire} PASSWORD ERROR`)
+          .paragraph(`${PREMIUM.emoji.sparkle} Error verifying password: ${e.message || e.error || String(e)}`)
+          .paragraph(divLine());
+        const fallback = `⚠️ PASSWORD ERROR\n\n✨ Error verifying password: ${e.message || e.error || String(e)}`;
+        await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+        return;
+      }
+
+      // Login complete (2FA verified)
+      try {
+        const sessionResult = await runPythonHelper(['get_session', session.phone]);
+        if (!sessionResult.error && sessionResult.session_string) {
+          session.sessionString = sessionResult.session_string;
+        }
+      } catch (e) {
+        // Session string not critical — continue anyway
+      }
       session.state = 'LOGGED_IN';
-      session.sessionString = generateSessionString();
       session.timestamp = Date.now();
       loginSessions.set(userId, session);
 
