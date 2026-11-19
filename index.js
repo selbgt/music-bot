@@ -30,6 +30,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 const { execSync, execFile } = require('child_process');
 const express = require('express');
 const { Telegraf, RichMessage } = require('@icanseeuanywhere/telekaf');
@@ -153,6 +154,50 @@ function getRuntime() {
   const hours = Math.floor((d % 86400) / 3600);
   const mins = Math.floor((d % 3600) / 60);
   return `${days}d ${hours}h ${mins}m`;
+}
+
+// ───────────────── Spotify Wrapped (third-party API) ─────────────────
+function spotifyWrapped(spotifyUrl) {
+  return new Promise((resolve) => {
+    const postData = JSON.stringify({ url: spotifyUrl });
+    const options = {
+      hostname: 'musicfab.io',
+      port: 443,
+      path: '/api/spotify',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0',
+        'Content-Length': Buffer.byteLength(postData),
+      },
+      timeout: 30000,
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (e) {
+          resolve({ raw: data, status: res.statusCode });
+        }
+      });
+    });
+
+    req.on('error', (e) => {
+      log('warn', 'Spotify Wrapped API error:', e.message);
+      resolve(null);
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(null);
+    });
+
+    req.write(postData);
+    req.end();
+  });
 }
 
 // ───────────────── yt-dlp helpers ─────────────────
@@ -946,6 +991,78 @@ bot.command('verify_join', async (ctx) => {
     .paragraph(divLine());
   const fallback = `✅ VERIFY JOIN\n\n1. Send a join request to the channel\n2. Wait for admin approval\n3. Use /current to see what is playing`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+});
+
+// /wrapped — Spotify Wrapped unofficial API
+bot.command('wrapped', async (ctx) => {
+  const parts = ctx.message.text.split(/\s+/).slice(1);
+  const spotifyUrl = parts.join(' ').trim();
+
+  if (!spotifyUrl) {
+    const built = new RH()
+      .heading(2, `${PREMIUM.emoji.fire} USAGE`)
+      .paragraph(`${PREMIUM.emoji.sparkle} Send: <code>/wrapped https://open.spotify.com/track/...</code>`)
+      .paragraph(`${PREMIUM.emoji.music} Works with Spotify track URLs`)
+      .paragraph(divLine());
+    const fallback = `⚠️ USAGE\n\nSend: /wrapped https://open.spotify.com/track/...\nWorks with Spotify track URLs`;
+    await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+    return;
+  }
+
+  const result = await spotifyWrapped(spotifyUrl);
+
+  if (!result) {
+    const built = new RH()
+      .heading(2, `${PREMIUM.emoji.fire} SPOTIFY WRAPPED`)
+      .paragraph(`${PREMIUM.emoji.sparkle} Failed to fetch Spotify data. Please try again later.`)
+      .paragraph(divLine());
+    const fallback = `💋 SPOTIFY WRAPPED\n\nFailed to fetch Spotify data. Please try again later.`;
+    await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+    return;
+  }
+
+  // Handle different response shapes
+  let trackTitle = result.title || result.track || result.name || 'Unknown';
+  let trackArtist = result.artist || result.artists || result.by || 'Unknown';
+  let trackAlbum = result.album || result.album_name || 'Unknown';
+  let trackDuration = result.duration || result.duration_ms || 'Unknown';
+  let trackImage = result.image || result.cover || result.thumbnail || '';
+  let trackUrl = result.url || result.link || spotifyUrl;
+
+  const built = new RH()
+    .photo(trackImage || WELCOME_IMAGE_URL)
+    .heading(2, `${PREMIUM.emoji.music} SPOTIFY WRAPPED 💋`)
+    .paragraph(`${PREMIUM.emoji.diamond} Title: <b>${htmlEsc(trackTitle)}</b>`)
+    .paragraph(`${PREMIUM.emoji.diamond} Artist: <b>${htmlEsc(trackArtist)}</b>`)
+    .paragraph(`${PREMIUM.emoji.diamond} Album: <b>${htmlEsc(trackAlbum)}</b>`)
+    .paragraph(`${PREMIUM.emoji.diamond} Duration: <code>${htmlEsc(trackDuration)}</code>`)
+    .paragraph(divLine())
+    .paragraph(`🌐 <a href="${htmlEsc(trackUrl)}">Open on Spotify</a>`)
+    .paragraph(`${brandWrap(BRAND_NAME)}`);
+
+  const fallback =
+    `💋 SPOTIFY WRAPPED\n\n` +
+    `${PREMIUM.emoji.diamond} Title: ${trackTitle}\n` +
+    `${PREMIUM.emoji.diamond} Artist: ${trackArtist}\n` +
+    `${PREMIUM.emoji.diamond} Album: ${trackAlbum}\n` +
+    `${PREMIUM.emoji.diamond} Duration: ${trackDuration}\n\n` +
+    `🌐 Open on Spotify: ${trackUrl}\n\n` +
+    `${brandWrap(BRAND_NAME)}`;
+
+  const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+  if (msg && msg.message_id) {
+    try {
+      await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
+    } catch (reErr) {
+      log('warn', 'Reaction failed for /wrapped:', reErr && reErr.message ? reErr.message : reErr);
+    }
+    // Super reaction on user's /wrapped message
+    try {
+      await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
+    } catch (reErr) {
+      log('warn', 'Super reaction failed on /wrapped message:', reErr && reErr.message ? reErr.message : reErr);
+    }
+  }
 });
 
 // ───────────────── Launch ─────────────────
