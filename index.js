@@ -595,19 +595,21 @@ bot.start(async (ctx) => {
           await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
           log('success', '💋 reaction set on welcome card (group)');
         } catch (reErr) {
-          log('warn', 'Welcome card reaction failed (group):', reErr && reErr.message ? reErr.message : reErr);
+          const errMsg = reErr && reErr.response ? reErr.response.body : (reErr && reErr.message ? reErr.message : String(reErr));
+          log('warn', 'Welcome card reaction failed (group):', errMsg);
         }
       }
-      // Super reaction on user's /start command message (is_big = true makes it "super")
+      // Super reaction on user's /start command message
       try {
         if (ctx.message && ctx.message.message_id) {
-          await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }], is_big: true });
-          log('success', '💋 super reaction (is_big) on /start (group)');
+          await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
+          log('success', '💋 reaction on /start user message (group)');
         } else {
-          log('warn', 'No ctx.message.message_id available for super reaction on /start (group)');
+          log('warn', 'No ctx.message.message_id available (group)');
         }
       } catch (reErr) {
-        log('warn', 'Super reaction on /start failed (group) — error:', JSON.stringify(reErr));
+        const errMsg = reErr && reErr.response ? reErr.response.body : (reErr && reErr.message ? reErr.message : String(reErr));
+        log('warn', 'Super reaction on /start failed (group):', errMsg);
       }
       return;
     }
@@ -636,24 +638,26 @@ bot.start(async (ctx) => {
       `${brandWrap(BRAND_NAME)}`;
 
     const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, { reply_markup: INLINE_KEYBOARD }, { celebration: true });
-    if (msg && msg.message_id) {
-      try {
-        await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
-        log('success', '💋 reaction set on welcome card (private)');
-      } catch (reErr) {
-        log('warn', 'Welcome card reaction failed (private):', reErr && reErr.message ? reErr.message : reErr);
+      if (msg && msg.message_id) {
+        try {
+          await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
+          log('success', '💋 reaction set on welcome card (private)');
+        } catch (reErr) {
+          const errMsg = reErr && reErr.response ? reErr.response.body : (reErr && reErr.message ? reErr.message : String(reErr));
+          log('warn', 'Welcome card reaction failed (private):', errMsg);
+        }
       }
-    }
-    // Super reaction on user's /start command message (is_big = true makes it "super")
+    // Super reaction on user's /start command message
     try {
       if (ctx.message && ctx.message.message_id) {
-        await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }], is_big: true });
-        log('success', '💋 super reaction (is_big) on /start (private)');
+        await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
+        log('success', '💋 reaction on /start user message (private)');
       } else {
-        log('warn', 'No ctx.message.message_id available for super reaction on /start (private)');
+        log('warn', 'No ctx.message.message_id available (private)');
       }
     } catch (reErr) {
-      log('warn', 'Super reaction on /start failed (private) — error:', JSON.stringify(reErr));
+      const errMsg = reErr && reErr.response ? reErr.response.body : (reErr && reErr.message ? reErr.message : String(reErr));
+      log('warn', 'Super reaction on /start failed (private):', errMsg);
     }
   } catch (e) {
     log('warn', '/start sendRichCard failed:', e && e.message ? e.message : e);
@@ -1179,19 +1183,21 @@ bot.command('wrapped', async (ctx) => {
       await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
       log('success', '💋 reaction set on /wrapped card');
     } catch (reErr) {
-      log('warn', 'Welcome card reaction failed (/wrapped):', reErr && reErr.message ? reErr.message : reErr);
+      const errMsg = reErr && reErr.response ? reErr.response.body : (reErr && reErr.message ? reErr.message : String(reErr));
+      log('warn', 'Welcome card reaction failed (/wrapped):', errMsg);
     }
   }
-  // Super reaction on user's /wrapped command message (is_big = true makes it "super")
+  // Super reaction on user's /wrapped command message
   try {
     if (ctx.message && ctx.message.message_id) {
-      await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }], is_big: true });
-      log('success', '💋 super reaction (is_big) on /wrapped');
+      await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
+      log('success', '💋 reaction on /wrapped user message');
     } else {
-      log('warn', 'No ctx.message.message_id available for super reaction on /wrapped');
+      log('warn', 'No ctx.message.message_id available (/wrapped)');
     }
   } catch (reErr) {
-    log('warn', 'Super reaction on /wrapped failed — error:', JSON.stringify(reErr));
+    const errMsg = reErr && reErr.response ? reErr.response.body : (reErr && reErr.message ? reErr.message : String(reErr));
+    log('warn', 'Super reaction on /wrapped failed:', errMsg);
   }
 });
 
