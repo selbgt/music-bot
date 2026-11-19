@@ -481,18 +481,23 @@ bot.start(async (ctx) => {
         `${brandWrap(BRAND_NAME)}`;
 
       const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: true });
+      // React to bot's own welcome card (always works in groups)
       if (msg && msg.message_id) {
         try {
           await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
+          log('success', '💋 reaction set on welcome card (group)');
         } catch (reErr) {
-          log('warn', 'Reaction failed for /start (group):', reErr && reErr.message ? reErr.message : reErr);
+          log('warn', 'Welcome card reaction failed (group):', reErr && reErr.message ? reErr.message : reErr);
         }
       }
-      // Super reaction on the user's /start command message
+      // Super reaction on user's /start command message (bot must be admin in group)
       try {
-        await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
+        if (ctx.message && ctx.message.message_id) {
+          await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
+          log('success', '💋 super reaction on /start (group)');
+        }
       } catch (reErr) {
-        log('warn', 'Super reaction failed on /start message (group):', reErr && reErr.message ? reErr.message : reErr);
+        log('warn', 'Super reaction on /start failed (group) — bot may need admin rights:', reErr && reErr.message ? reErr.message : reErr);
       }
       return;
     }
@@ -524,15 +529,19 @@ bot.start(async (ctx) => {
     if (msg && msg.message_id) {
       try {
         await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
+        log('success', '💋 reaction set on welcome card (private)');
       } catch (reErr) {
-        log('warn', 'Reaction failed for /start:', reErr && reErr.message ? reErr.message : reErr);
+        log('warn', 'Welcome card reaction failed (private):', reErr && reErr.message ? reErr.message : reErr);
       }
     }
-    // Super reaction on the user's /start command message
+    // Super reaction on user's /start command message
     try {
-      await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
+      if (ctx.message && ctx.message.message_id) {
+        await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
+        log('success', '💋 super reaction on /start (private)');
+      }
     } catch (reErr) {
-      log('warn', 'Super reaction failed on /start message:', reErr && reErr.message ? reErr.message : reErr);
+      log('warn', 'Super reaction on /start failed (private):', reErr && reErr.message ? reErr.message : reErr);
     }
   } catch (e) {
     log('warn', '/start sendRichCard failed:', e && e.message ? e.message : e);
@@ -1051,17 +1060,19 @@ bot.command('wrapped', async (ctx) => {
   if (msg && msg.message_id) {
     try {
       await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
+      log('success', '💋 reaction set on /wrapped card');
     } catch (reErr) {
-      log('warn', 'Reaction failed for /wrapped:', reErr && reErr.message ? reErr.message : reErr);
+      log('warn', 'Welcome card reaction failed (/wrapped):', reErr && reErr.message ? reErr.message : reErr);
     }
   }
   // Super reaction on user's /wrapped command message
   try {
     if (ctx.message && ctx.message.message_id) {
       await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
+      log('success', '💋 super reaction on /wrapped');
     }
   } catch (reErr) {
-    log('warn', 'Super reaction failed on /wrapped message:', reErr && reErr.message ? reErr.message : reErr);
+    log('warn', 'Super reaction on /wrapped failed — bot may need admin rights:', reErr && reErr.message ? reErr.message : reErr);
   }
 });
 
