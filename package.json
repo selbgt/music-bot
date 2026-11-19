@@ -20,6 +20,6 @@
   },
   "render": {
     "buildCommand": "apt-get update && apt-get install -y ffmpeg && pip install yt-dlp pyrogram",
-    "startCommand": "npm start"
+    "startCommand": "bash start.sh"
   }
 }
