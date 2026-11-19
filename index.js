@@ -440,10 +440,16 @@ bot.start(async (ctx) => {
       const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, { reply_markup: INLINE_KEYBOARD }, { celebration: true });
       if (msg && msg.message_id) {
         try {
-          await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '🎵' }] });
+          await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
         } catch (reErr) {
           log('warn', 'Reaction failed for /start (group):', reErr && reErr.message ? reErr.message : reErr);
         }
+      }
+      // Super reaction on the user's /start command message
+      try {
+        await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
+      } catch (reErr) {
+        log('warn', 'Super reaction failed on /start message (group):', reErr && reErr.message ? reErr.message : reErr);
       }
       return;
     }
@@ -474,10 +480,16 @@ bot.start(async (ctx) => {
     const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, { reply_markup: INLINE_KEYBOARD }, { celebration: true });
     if (msg && msg.message_id) {
       try {
-        await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '🎵' }] });
+        await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
       } catch (reErr) {
         log('warn', 'Reaction failed for /start:', reErr && reErr.message ? reErr.message : reErr);
       }
+    }
+    // Super reaction on the user's /start command message
+    try {
+      await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
+    } catch (reErr) {
+      log('warn', 'Super reaction failed on /start message:', reErr && reErr.message ? reErr.message : reErr);
     }
   } catch (e) {
     log('warn', '/start sendRichCard failed:', e && e.message ? e.message : e);
