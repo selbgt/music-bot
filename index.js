@@ -110,11 +110,16 @@ const FANCY = (() => {
 
 // Plain text output — no fancy unicode fonts (mobile-safe rendering)
 
-// Premium decorative elements
+// Premium decorative elements — each symbol has a specific purpose
 const PREMIUM = {
-  div: '◈┆❋𓆩𓆪࿐',
+  musicDot: '◈',        // music playing / track points
+  separator: '┆',       // line separator (divides two sections)
+  bullet: '❋',          // bullet point for lists
+  brandOpen: '𓆩',      // brand wrapper open
+  brandClose: '𓆪',     // brand wrapper close
+  decoEnd: '࿐',         // decorative end flourish
   emoji: {
-    sparkle: '✨',
+    sparkle: '✨',      // shine / highlight
     star: '🌟',
     glow: '💫',
     heart: '💖',
@@ -130,7 +135,11 @@ const PREMIUM = {
   },
 };
 
-const divLine = () => `${PREMIUM.emoji.sparkle} ${PREMIUM.div} ${PREMIUM.emoji.sparkle}`;
+// Line separator — ┆ divides two lines/sections
+const divLine = () => `${PREMIUM.emoji.sparkle} ${PREMIUM.separator} ${PREMIUM.emoji.sparkle}`;
+
+// Wrap brand name: 𓆩Dev X Music𓆪
+const brandWrap = (text) => `${PREMIUM.brandOpen}${text}${PREMIUM.brandClose}`;
 
 const htmlEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');
 
@@ -404,12 +413,12 @@ bot.start(async (ctx) => {
       // Group start card — uptime + status + commands preview
       const built = new RH()
         .photo(WELCOME_IMAGE_URL)
-        .heading(1, `👑 ${BRAND_NAME} — Group Active`)
+        .heading(1, `${brandWrap(BRAND_NAME)} — Group Active`)
         .paragraph(`${PREMIUM.emoji.sparkle} Bot is running in this group!`)
         .paragraph(`${PREMIUM.emoji.diamond} Uptime: <code>${runtime}</code>`)
         .paragraph(`${PREMIUM.emoji.diamond} Status: <code>● ONLINE</code>`)
-        .paragraph(`${PREMIUM.emoji.music} Use /play <song> to play music in voice chat`)
-        .paragraph(`${PREMIUM.emoji.headphone} Use /vplay <song> to play video in voice chat`)
+        .paragraph(`${PREMIUM.musicDot} Music Playing ▶️ /play <song> — Play music in voice chat`)
+        .paragraph(`${PREMIUM.musicDot} Video Playing ▶️ /vplay <song> — Play video in voice chat`)
         .paragraph(divLine())
         .buttonRow([
           { text: 'Help', callback_data: 'help' },
@@ -417,16 +426,16 @@ bot.start(async (ctx) => {
           { text: 'Group', url: 'https://t.me/devxbackup' },
         ])
         .paragraph(divLine())
-        .paragraph(`👑 ${BRAND_NAME}`);
+        .paragraph(brandWrap(BRAND_NAME));
 
       const fallback =
-        `👑 ${BRAND_NAME} — Group Active\n\n` +
+        `${brandWrap(BRAND_NAME)} — Group Active\n\n` +
         `${PREMIUM.emoji.sparkle} Bot is running in this group!\n` +
         `${PREMIUM.emoji.diamond} Uptime: ${runtime}\n` +
         `${PREMIUM.emoji.diamond} Status: ● ONLINE\n\n` +
-        `${PREMIUM.emoji.music} /play <song> — Play music in voice chat\n` +
-        `${PREMIUM.emoji.headphone} /vplay <song> — Play video in voice chat\n\n` +
-        `👑 ${BRAND_NAME}`;
+        `${PREMIUM.musicDot} Music Playing ▶️ /play <song> — Play music in voice chat\n` +
+        `${PREMIUM.musicDot} Video Playing ▶️ /vplay <song> — Play video in voice chat\n\n` +
+        `${brandWrap(BRAND_NAME)}`;
 
       const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, { reply_markup: INLINE_KEYBOARD }, { celebration: true });
       if (msg && msg.message_id) {
@@ -453,14 +462,14 @@ bot.start(async (ctx) => {
         { text: 'Group', url: 'https://t.me/devxbackup' },
       ])
       .paragraph(divLine())
-      .paragraph(`👑 ${BRAND_NAME}`);
+      .paragraph(brandWrap(BRAND_NAME));
 
     const fallback =
       `✨ Welcome to ${BRAND_NAME}\n\n` +
       `${PREMIUM.emoji.music} lets you stream high-quality music and video directly in Telegram voice and video chats.\n\n` +
       `Supported platforms: YouTube, Spotify, Apple Music, SoundCloud, Deezer, Twitch, and many more.\n\n` +
       `Use the buttons below to add the bot to your group or explore the available commands.\n\n` +
-      `👑 ${BRAND_NAME}`;
+      `${brandWrap(BRAND_NAME)}`;
 
     const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, { reply_markup: INLINE_KEYBOARD }, { celebration: true });
     if (msg && msg.message_id) {
@@ -573,7 +582,7 @@ bot.command('menu', async (ctx) => {
       );
 
     const fallback =
-      `<b>『 👑 ${BRAND_NAME.toUpperCase()} 』</b>\n${DIVIDER}\n\n` +
+      `<b>『 ${brandWrap(BRAND_NAME.toUpperCase())} 』</b>\n${DIVIDER}\n\n` +
       `⌨️ <b>COMMANDS</b>\n\n` +
       `• /start — Welcome card\n` +
       `• /play — Play music\n` +
@@ -668,7 +677,7 @@ bot.action('menu', async (ctx) => {
       .paragraph(`${PREMIUM.emoji.magic} /nowplaying — Open rich music player card`)
       .paragraph(divLine())
       .paragraph(`🌐 <a href="${PUBLIC_URL}/player">Open HTML Player</a>`)
-      .paragraph(`👑 ${BRAND_NAME}`);
+      .paragraph(brandWrap(BRAND_NAME));
     const fallback =
       `⌨️ ${BRAND_NAME} — Commands\n\n` +
       `• /start — Welcome card\n` +
@@ -849,13 +858,13 @@ bot.command('queue', async (ctx) => {
     return;
   }
   const lines = music.queue.map((t, i) =>
-    `${i === music.current.index ? '🎧' : '  '} ${i + 1}. ${htmlEsc(t.title)} — ${htmlEsc(t.artist || 'Unknown')} (${t.duration})`
+    `${i === music.current.index ? '🎧' : PREMIUM.bullet} ${i + 1}. ${htmlEsc(t.title)} — ${htmlEsc(t.artist || 'Unknown')} (${t.duration})`
   ).join('\n');
   const built = new RH()
     .heading(2, `${PREMIUM.emoji.diamond} QUEUE`)
     .paragraph(`<code>${lines}</code>`)
     .paragraph(divLine())
-    .paragraph(`👑 ${BRAND_NAME}`);
+    .paragraph(brandWrap(BRAND_NAME));
   const fallback = `📋 QUEUE\n\n${lines}\n\n🤖 ${BRAND_NAME}`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
