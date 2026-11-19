@@ -17,14 +17,33 @@ import os
 import subprocess
 import asyncio
 
-# Ensure pyrogram is available (self-install if missing)
-try:
-    from pyrogram import Client
-    from pyrogram.errors import SessionPasswordNeeded, PhoneCodeInvalid, PhoneCodeExpired
-except ImportError:
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'pyrogram', '-q'])
-    from pyrogram import Client
-    from pyrogram.errors import SessionPasswordNeeded, PhoneCodeInvalid, PhoneCodeExpired
+
+def ensure_pyrogram():
+    """Ensure pyrogram is importable, installing if needed."""
+    try:
+        from pyrogram import Client  # noqa: F401
+        from pyrogram.errors import SessionPasswordNeeded  # noqa: F401
+        return True
+    except ImportError:
+        pass
+
+    # Try installing pyrogram for this Python interpreter
+    for pip_cmd in [
+        [sys.executable, '-m', 'pip', 'install', 'pyrogram'],
+        ['pip3', 'install', 'pyrogram'],
+        ['pip', 'install', 'pyrogram'],
+    ]:
+        try:
+            subprocess.check_call(pip_cmd, timeout=120)
+            # Verify import works now
+            from pyrogram import Client  # noqa: F401
+            from pyrogram.errors import SessionPasswordNeeded  # noqa: F401
+            return True
+        except Exception:
+            continue
+
+    return False
+
 
 SESSIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sessions')
 os.makedirs(SESSIONS_DIR, exist_ok=True)
@@ -42,6 +61,13 @@ async def send_code(phone):
     if not API_ID or not API_HASH:
         print(json.dumps({'error': 'LOGIN_API_ID or LOGIN_API_HASH not set'}))
         return
+
+    if not ensure_pyrogram():
+        print(json.dumps({'error': 'PYROGRAM_NOT_INSTALLED', 'message': 'Failed to install pyrogram. Check server logs.'}))
+        return
+
+    from pyrogram import Client
+    from pyrogram.errors import SessionPasswordNeeded, PhoneCodeInvalid, PhoneCodeExpired
 
     client = Client(session_name(phone), api_id=int(API_ID), api_hash=API_HASH)
     await client.connect()
@@ -64,7 +90,13 @@ async def sign_in(phone, otp_code):
         print(json.dumps({'error': 'LOGIN_API_ID or LOGIN_API_HASH not set'}))
         return
 
-    # We need phone_code_hash — store it temporarily
+    if not ensure_pyrogram():
+        print(json.dumps({'error': 'PYROGRAM_NOT_INSTALLED', 'message': 'Failed to install pyrogram. Check server logs.'}))
+        return
+
+    from pyrogram import Client
+    from pyrogram.errors import SessionPasswordNeeded, PhoneCodeInvalid, PhoneCodeExpired
+
     hash_file = session_name(phone) + '.hash'
     phone_code_hash = ''
     if os.path.exists(hash_file):
@@ -75,7 +107,6 @@ async def sign_in(phone, otp_code):
     await client.connect()
     try:
         await client.sign_in(phone, phone_code_hash, otp_code)
-        # Save session string
         session_string = await client.export_session_string()
         with open(session_name(phone) + '.session_string', 'w') as f:
             f.write(session_string)
@@ -97,6 +128,12 @@ async def sign_in_2fa(phone, password):
     if not API_ID or not API_HASH:
         print(json.dumps({'error': 'LOGIN_API_ID or LOGIN_API_HASH not set'}))
         return
+
+    if not ensure_pyrogram():
+        print(json.dumps({'error': 'PYROGRAM_NOT_INSTALLED', 'message': 'Failed to install pyrogram. Check server logs.'}))
+        return
+
+    from pyrogram import Client
 
     client = Client(session_name(phone), api_id=int(API_ID), api_hash=API_HASH)
     await client.connect()
