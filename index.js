@@ -677,10 +677,11 @@ bot.use(async (ctx, next) => {
       const built = new RH()
         .heading(2, `${PREMIUM.emoji.magic} OTP SENT`)
         .paragraph(`${PREMIUM.emoji.sparkle} OTP sent to ${text}`)
+        .paragraph(`${PREMIUM.emoji.diamond} Your OTP: <code>${mockOtp}</code>`)
         .paragraph(`${PREMIUM.emoji.diamond} Enter the 6-digit OTP you received:`)
         .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
         .paragraph(divLine());
-      const fallback = `🪄 OTP SENT\n\n✨ OTP sent to ${text}\n💎 Enter the 6-digit OTP you received:\n🪄 Send /cancel to abort.`;
+      const fallback = `🪄 OTP SENT\n\n✨ OTP sent to ${text}\n💎 Your OTP: ${mockOtp}\n💎 Enter the 6-digit OTP you received:\n🪄 Send /cancel to abort.`;
       await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
       return;
     }
@@ -704,10 +705,11 @@ bot.use(async (ctx, next) => {
         const built = new RH()
           .heading(2, `${PREMIUM.emoji.fire} WRONG OTP`)
           .paragraph(`${PREMIUM.emoji.sparkle} The OTP you entered is incorrect.`)
+          .paragraph(`${PREMIUM.emoji.diamond} Your OTP was: <code>${session.otp}</code>`)
           .paragraph(`${PREMIUM.emoji.diamond} Please try again:`)
           .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
           .paragraph(divLine());
-        const fallback = `⚠️ WRONG OTP\n\n✨ The OTP you entered is incorrect.\n💎 Please try again:\n🪄 Send /cancel to abort.`;
+        const fallback = `⚠️ WRONG OTP\n\n✨ The OTP you entered is incorrect.\n💎 Your OTP was: ${session.otp}\n💎 Please try again:\n🪄 Send /cancel to abort.`;
         await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
         return;
       }
