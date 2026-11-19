@@ -170,7 +170,6 @@ function spotifyWrapped(spotifyUrl) {
         'User-Agent': 'Mozilla/5.0',
         'Content-Length': Buffer.byteLength(postData),
       },
-      timeout: 30000,
     };
 
     const req = https.request(options, (res) => {
@@ -190,13 +189,12 @@ function spotifyWrapped(spotifyUrl) {
       resolve(null);
     });
 
-    req.on('timeout', () => {
+    req.setTimeout(30000, () => {
       req.destroy();
       resolve(null);
     });
 
-    req.write(postData);
-    req.end();
+    req.end(postData);
   });
 }
 
@@ -1049,19 +1047,21 @@ bot.command('wrapped', async (ctx) => {
     `🌐 Open on Spotify: ${trackUrl}\n\n` +
     `${brandWrap(BRAND_NAME)}`;
 
-  const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+  const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: true });
   if (msg && msg.message_id) {
     try {
       await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
     } catch (reErr) {
       log('warn', 'Reaction failed for /wrapped:', reErr && reErr.message ? reErr.message : reErr);
     }
-    // Super reaction on user's /wrapped message
-    try {
+  }
+  // Super reaction on user's /wrapped command message
+  try {
+    if (ctx.message && ctx.message.message_id) {
       await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
-    } catch (reErr) {
-      log('warn', 'Super reaction failed on /wrapped message:', reErr && reErr.message ? reErr.message : reErr);
     }
+  } catch (reErr) {
+    log('warn', 'Super reaction failed on /wrapped message:', reErr && reErr.message ? reErr.message : reErr);
   }
 });
 
