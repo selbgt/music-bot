@@ -475,8 +475,11 @@ async function sendRichCard(ctx, chatId, built, fallbackHtml, extra = {}, opts =
   const richExtra = { ...extra };
 
   if (tg.sendRichMessage) {
+    // Only apply celebration effect (message_effect_id) when opts.celebration is true
+    // Note: Telegram message effects only work in private chats, NOT in groups
+    const celebrationEffect = opts.celebration ? { message_effect_id: '5046509860389126442' } : {};
     const withEffect = await attempt('rich+effect', () =>
-      tg.sendRichMessage(chatId, normalizedBuilt, { ...richExtra, message_effect_id: '5046509860389126442' })
+      tg.sendRichMessage(chatId, normalizedBuilt, { ...richExtra, ...celebrationEffect })
     );
     if (withEffect) return withEffect;
     const plainRich = await attempt('rich', () => tg.sendRichMessage(chatId, normalizedBuilt, richExtra));
@@ -834,8 +837,9 @@ bot.start(async (ctx) => {
           log('warn', 'No ctx.message.message_id available (group)');
         }
       } catch (reErr) {
+        const status = reErr && reErr.response ? reErr.response.statusCode : 'unknown';
         const errMsg = reErr && reErr.response ? reErr.response.body : (reErr && reErr.message ? reErr.message : String(reErr));
-        log('warn', 'Super reaction on /start failed (group):', errMsg);
+        log('warn', `Super reaction on /start failed (group) [HTTP ${status}]:`, errMsg);
       }
       return;
     }
@@ -882,8 +886,9 @@ bot.start(async (ctx) => {
         log('warn', 'No ctx.message.message_id available (private)');
       }
     } catch (reErr) {
+      const status = reErr && reErr.response ? reErr.response.statusCode : 'unknown';
       const errMsg = reErr && reErr.response ? reErr.response.body : (reErr && reErr.message ? reErr.message : String(reErr));
-      log('warn', 'Super reaction on /start failed (private):', errMsg);
+      log('warn', `Super reaction on /start failed (private) [HTTP ${status}]:`, errMsg);
     }
   } catch (e) {
     log('warn', '/start sendRichCard failed:', e && e.message ? e.message : e);
@@ -1451,8 +1456,9 @@ bot.command('wrapped', async (ctx) => {
       log('warn', 'No ctx.message.message_id available (/wrapped)');
     }
   } catch (reErr) {
+    const status = reErr && reErr.response ? reErr.response.statusCode : 'unknown';
     const errMsg = reErr && reErr.response ? reErr.response.body : (reErr && reErr.message ? reErr.message : String(reErr));
-    log('warn', 'Super reaction on /wrapped failed:', errMsg);
+    log('warn', `Super reaction on /wrapped failed [HTTP ${status}]:`, errMsg);
   }
 });
 
