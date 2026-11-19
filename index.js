@@ -67,6 +67,43 @@ if (!OWNER_ID) { console.error('❌ Missing OWNER_ID'); process.exit(1); }
 
 fs.mkdirSync(DOWNLOAD_DIR, { recursive: true });
 
+// ════════════════════════════════════════════════════════════════════
+//  PERSISTENT SESSION STORAGE (GitHub-safe)
+// ════════════════════════════════════════════════════════════════════
+const SESSIONS_FILE = path.join(__dirname, 'sessions.json');
+
+// Load saved sessions from file (survives bot restarts)
+function loadSessions() {
+  try {
+    if (!fs.existsSync(SESSIONS_FILE)) return {};
+    const raw = fs.readFileSync(SESSIONS_FILE, 'utf8');
+    return JSON.parse(raw);
+  } catch (e) {
+    log('warn', 'Failed to load sessions file:', e.message);
+    return {};
+  }
+}
+
+// Save sessions to file
+function saveSessions(sessions) {
+  try {
+    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessions, null, 2));
+    log('success', 'Sessions saved to sessions.json');
+  } catch (e) {
+    log('error', 'Failed to save sessions:', e.message);
+  }
+}
+
+const SESSIONS = loadSessions();
+
+// Restore owner session from saved file on startup
+if (SESSIONS.owner) {
+  ownerApiId = SESSIONS.owner.apiId || null;
+  ownerApiHash = SESSIONS.owner.apiHash || null;
+  ownerSession = SESSIONS.owner.sessionString || null;
+  log('success', 'Owner session restored from sessions.json');
+}
+
 const START_TS = Date.now();
 const DIVIDER = '⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯';
 
@@ -708,14 +745,24 @@ bot.use(async (ctx, next) => {
       session.timestamp = Date.now();
       loginSessions.set(userId, session);
 
+      // Save session persistently to sessions.json (survives bot restarts)
+      SESSIONS.owner = {
+        apiId: ownerApiId || 'saved',
+        apiHash: ownerApiHash || 'saved',
+        sessionString: session.password || text,
+        phone: session.phone,
+        loggedInAt: new Date().toISOString(),
+      };
+      saveSessions(SESSIONS);
+
       const built = new RH()
         .heading(2, `${PREMIUM.emoji.gift} LOGIN SUCCESSFUL`)
         .paragraph(`${PREMIUM.emoji.sparkle} Welcome! You are now logged in.`)
         .paragraph(`${PREMIUM.emoji.diamond} Phone: ${session.phone}`)
-        .paragraph(`${PREMIUM.emoji.diamond} Status: Active`)
+        .paragraph(`${PREMIUM.emoji.diamond} Session saved — will auto-reconnect on restart`)
         .paragraph(`${PREMIUM.emoji.magic} You can now use all bot features.`)
         .paragraph(divLine());
-      const fallback = `✅ LOGIN SUCCESSFUL\n\n✨ Welcome! You are now logged in.\n💎 Phone: ${session.phone}\n💎 Status: Active\n🪄 You can now use all bot features.`;
+      const fallback = `✅ LOGIN SUCCESSFUL\n\n✨ Welcome! You are now logged in.\n💎 Phone: ${session.phone}\n💎 Session saved — will auto-reconnect on restart\n🪄 You can now use all bot features.`;
       await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: true });
       clearLoginSession(userId);
       return;
@@ -898,6 +945,9 @@ bot.command('cancel', async (ctx) => {
     return;
   }
   clearLoginSession(userId);
+  // Clear saved persistent session
+  delete SESSIONS.owner;
+  saveSessions(SESSIONS);
   const built = new RH()
     .heading(2, `${PREMIUM.emoji.gift} LOGIN CANCELLED`)
     .paragraph(`${PREMIUM.emoji.sparkle} Login process has been cancelled.`)
@@ -921,11 +971,15 @@ bot.command('logout', async (ctx) => {
   ownerSession = null;
   ownerApiId = null;
   ownerApiHash = null;
+  // Clear saved persistent session
+  delete SESSIONS.owner;
+  saveSessions(SESSIONS);
   const built = new RH()
     .heading(2, `${PREMIUM.emoji.gift} SESSION CLEARED`)
     .paragraph(`${PREMIUM.emoji.sparkle} Owner session cleared successfully.`)
+    .paragraph(`${PREMIUM.emoji.magic} Session removed from storage — bot will not auto-reconnect`)
     .paragraph(divLine());
-  const fallback = `✅ SESSION CLEARED\n\nOwner session cleared successfully.`;
+  const fallback = `✅ SESSION CLEARED\n\n✨ Owner session cleared successfully.\n🪄 Session removed from storage — bot will not auto-reconnect`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
 
