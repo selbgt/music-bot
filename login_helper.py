@@ -14,9 +14,17 @@ Usage:
 import sys
 import json
 import os
+import subprocess
 import asyncio
-from pyrogram import Client
-from pyrogram.errors import SessionPasswordNeeded, PhoneCodeInvalid, PhoneCodeExpired
+
+# Ensure pyrogram is available (self-install if missing)
+try:
+    from pyrogram import Client
+    from pyrogram.errors import SessionPasswordNeeded, PhoneCodeInvalid, PhoneCodeExpired
+except ImportError:
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'pyrogram', '-q'])
+    from pyrogram import Client
+    from pyrogram.errors import SessionPasswordNeeded, PhoneCodeInvalid, PhoneCodeExpired
 
 SESSIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sessions')
 os.makedirs(SESSIONS_DIR, exist_ok=True)
