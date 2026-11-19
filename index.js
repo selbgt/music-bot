@@ -598,14 +598,16 @@ bot.start(async (ctx) => {
           log('warn', 'Welcome card reaction failed (group):', reErr && reErr.message ? reErr.message : reErr);
         }
       }
-      // Super reaction on user's /start command message (bot must be admin in group)
+      // Super reaction on user's /start command message (is_big = true makes it "super")
       try {
         if (ctx.message && ctx.message.message_id) {
-          await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
-          log('success', '💋 super reaction on /start (group)');
+          await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }], is_big: true });
+          log('success', '💋 super reaction (is_big) on /start (group)');
+        } else {
+          log('warn', 'No ctx.message.message_id available for super reaction on /start (group)');
         }
       } catch (reErr) {
-        log('warn', 'Super reaction on /start failed (group) — bot may need admin rights:', reErr && reErr.message ? reErr.message : reErr);
+        log('warn', 'Super reaction on /start failed (group) — error:', JSON.stringify(reErr));
       }
       return;
     }
@@ -642,14 +644,16 @@ bot.start(async (ctx) => {
         log('warn', 'Welcome card reaction failed (private):', reErr && reErr.message ? reErr.message : reErr);
       }
     }
-    // Super reaction on user's /start command message
+    // Super reaction on user's /start command message (is_big = true makes it "super")
     try {
       if (ctx.message && ctx.message.message_id) {
-        await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
-        log('success', '💋 super reaction on /start (private)');
+        await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }], is_big: true });
+        log('success', '💋 super reaction (is_big) on /start (private)');
+      } else {
+        log('warn', 'No ctx.message.message_id available for super reaction on /start (private)');
       }
     } catch (reErr) {
-      log('warn', 'Super reaction on /start failed (private):', reErr && reErr.message ? reErr.message : reErr);
+      log('warn', 'Super reaction on /start failed (private) — error:', JSON.stringify(reErr));
     }
   } catch (e) {
     log('warn', '/start sendRichCard failed:', e && e.message ? e.message : e);
@@ -1178,14 +1182,16 @@ bot.command('wrapped', async (ctx) => {
       log('warn', 'Welcome card reaction failed (/wrapped):', reErr && reErr.message ? reErr.message : reErr);
     }
   }
-  // Super reaction on user's /wrapped command message
+  // Super reaction on user's /wrapped command message (is_big = true makes it "super")
   try {
     if (ctx.message && ctx.message.message_id) {
-      await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
-      log('success', '💋 super reaction on /wrapped');
+      await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: ctx.message.message_id, reaction: [{ type: 'emoji', emoji: '💋' }], is_big: true });
+      log('success', '💋 super reaction (is_big) on /wrapped');
+    } else {
+      log('warn', 'No ctx.message.message_id available for super reaction on /wrapped');
     }
   } catch (reErr) {
-    log('warn', 'Super reaction on /wrapped failed — bot may need admin rights:', reErr && reErr.message ? reErr.message : reErr);
+    log('warn', 'Super reaction on /wrapped failed — error:', JSON.stringify(reErr));
   }
 });
 
