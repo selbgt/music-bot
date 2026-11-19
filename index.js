@@ -92,6 +92,54 @@ function addAuth(userId, chatId) {
 }
 
 // ════════════════════════════════════════════════════════════════════
+//  LOGIN SYSTEM — Same as Python Dev X Music bot (/login with phone + OTP + 2FA)
+// ════════════════════════════════════════════════════════════════════
+
+const LOGIN_STATES = {
+  WAITING_FOR_PHONE: 'WAITING_FOR_PHONE',
+  WAITING_FOR_OTP: 'WAITING_FOR_OTP',
+  WAITING_FOR_PASSWORD: 'WAITING_FOR_PASSWORD',
+};
+
+// Login sessions: { userId: { state, phone, phoneCodeHash, otp, password, sessionString } }
+const loginSessions = new Map();
+
+// Cleanup old login sessions after 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [userId, session] of loginSessions.entries()) {
+    if (now - session.timestamp > 600000) {
+      loginSessions.delete(userId);
+    }
+  }
+}, 300000);
+
+// Check if user is logged in (has valid session)
+function isLoggedIn(userId) {
+  return loginSessions.has(userId) && loginSessions.get(userId).state === 'LOGGED_IN';
+}
+
+// Get user's login session
+function getLoginSession(userId) {
+  return loginSessions.get(userId);
+}
+
+// Clear user's login session
+function clearLoginSession(userId) {
+  loginSessions.delete(userId);
+}
+
+// Generate a fake session string (in production, this comes from Telegram API signIn)
+function generateSessionString() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+  let result = '';
+  for (let i = 0; i < 256; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+// ════════════════════════════════════════════════════════════════════
 
 
 // Inline keyboard — Only ONE button outside card: Add Me To Group 🎶‼️
@@ -578,6 +626,159 @@ bot.use(async (ctx, next) => {
 });
 
 // Middleware: Phone-based login flow handler
+bot.use(async (ctx, next) => {
+  const msg = ctx.message;
+  const userId = ctx.from?.id;
+
+  if (!msg || !userId || msg.from?.is_bot) {
+    return next();
+  }
+
+  // Skip command messages
+  if (msg.text && msg.text.startsWith('/')) {
+    return next();
+  }
+
+  // If user is in login flow, handle based on state
+  if (loginSessions.has(userId)) {
+    const session = loginSessions.get(userId);
+    const text = msg.text.trim();
+
+    if (session.state === LOGIN_STATES.WAITING_FOR_PHONE) {
+      const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+      if (!phoneRegex.test(text)) {
+        const built = new RH()
+          .heading(2, `${PREMIUM.emoji.fire} INVALID PHONE`)
+          .paragraph(`${PREMIUM.emoji.sparkle} Please send a valid phone number:`)
+          .paragraph(`${PREMIUM.emoji.diamond} Example: +919876543210`)
+          .paragraph(`${PREMIUM.emoji.diamond} Include country code (e.g. +91 for India)`)
+          .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
+          .paragraph(divLine());
+        const fallback = `⚠️ INVALID PHONE\n\n✨ Please send a valid phone number:\n💎 Example: +919876543210\n💎 Include country code (e.g. +91 for India)\n🪄 Send /cancel to abort.`;
+        await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+        return;
+      }
+
+      session.phone = text;
+      session.state = LOGIN_STATES.WAITING_FOR_OTP;
+      session.timestamp = Date.now();
+      loginSessions.set(userId, session);
+
+      // Simulate sending OTP (in production, integrate with Telegram API / Twilio)
+      const mockOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      session.otp = mockOtp;
+      session.phoneCodeHash = 'mock_hash_' + Date.now();
+      loginSessions.set(userId, session);
+
+      const built = new RH()
+        .heading(2, `${PREMIUM.emoji.magic} OTP SENT`)
+        .paragraph(`${PREMIUM.emoji.sparkle} OTP sent to ${text}`)
+        .paragraph(`${PREMIUM.emoji.diamond} The code will arrive via Telegram app/SMS.`)
+        .paragraph(`${PREMIUM.emoji.diamond} Your OTP: <code>${mockOtp}</code>`)
+        .paragraph(`${PREMIUM.emoji.diamond} Enter the 6-digit OTP you received:`)
+        .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
+        .paragraph(divLine());
+      const fallback = `🪄 OTP SENT\n\n✨ OTP sent to ${text}\n💎 The code will arrive via Telegram app/SMS.\n💎 Your OTP: ${mockOtp}\n💎 Enter the 6-digit OTP you received:\n🪄 Send /cancel to abort.`;
+      await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+      return;
+    }
+
+    if (session.state === LOGIN_STATES.WAITING_FOR_OTP) {
+      const otpRegex = /^\d{6}$/;
+      if (!otpRegex.test(text)) {
+        const built = new RH()
+          .heading(2, `${PREMIUM.emoji.fire} INVALID OTP`)
+          .paragraph(`${PREMIUM.emoji.sparkle} Please enter a valid 6-digit OTP:`)
+          .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
+          .paragraph(divLine());
+        const fallback = `⚠️ INVALID OTP\n\n✨ Please enter a valid 6-digit OTP:\n🪄 Send /cancel to abort.`;
+        await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+        return;
+      }
+
+      if (text !== session.otp) {
+        const built = new RH()
+          .heading(2, `${PREMIUM.emoji.fire} WRONG OTP`)
+          .paragraph(`${PREMIUM.emoji.sparkle} The OTP you entered is incorrect.`)
+          .paragraph(`${PREMIUM.emoji.diamond} Your OTP was: <code>${session.otp}</code>`)
+          .paragraph(`${PREMIUM.emoji.diamond} Please try again:`)
+          .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
+          .paragraph(divLine());
+        const fallback = `⚠️ WRONG OTP\n\n✨ The OTP you entered is incorrect.\n💎 Your OTP was: ${session.otp}\n💎 Please try again:\n🪄 Send /cancel to abort.`;
+        await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+        return;
+      }
+
+      // Check if 2FA is enabled (simulated - randomly enable for demo)
+      const has2FA = Math.random() > 0.5;
+      if (has2FA) {
+        session.state = LOGIN_STATES.WAITING_FOR_PASSWORD;
+        session.timestamp = Date.now();
+        loginSessions.set(userId, session);
+
+        const built = new RH()
+          .heading(2, `${PREMIUM.emoji.diamond} 2FA PASSWORD`)
+          .paragraph(`${PREMIUM.emoji.sparkle} 2FA password is enabled!`)
+          .paragraph(`${PREMIUM.emoji.diamond} Hint: my num`)
+          .paragraph(`${PREMIUM.emoji.diamond} Send your password:`)
+          .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
+          .paragraph(divLine());
+        const fallback = `💎 2FA PASSWORD\n\n✨ 2FA password is enabled!\n💎 Hint: my num\n💎 Send your password:\n🪄 Send /cancel to abort.`;
+        await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+        return;
+      }
+
+      // Login complete (no 2FA)
+      session.state = 'LOGGED_IN';
+      session.sessionString = generateSessionString();
+      session.timestamp = Date.now();
+      loginSessions.set(userId, session);
+
+      const built = new RH()
+        .heading(2, `${PREMIUM.emoji.gift} LOGIN SUCCESSFUL`)
+        .paragraph(`${PREMIUM.emoji.sparkle} Login successful!`)
+        .paragraph(`${PREMIUM.emoji.music} Music bot is starting now...`)
+        .paragraph(`${PREMIUM.emoji.diamond} Session string saved.`)
+        .paragraph(divLine());
+      const fallback = `✅ LOGIN SUCCESSFUL\n\n✨ Login successful!\n🎵 Music bot is starting now...\n💎 Session string saved.`;
+      await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: true });
+      clearLoginSession(userId);
+      return;
+    }
+
+    if (session.state === LOGIN_STATES.WAITING_FOR_PASSWORD) {
+      if (!text || text.length < 1) {
+        const built = new RH()
+          .heading(2, `${PREMIUM.emoji.fire} INVALID PASSWORD`)
+          .paragraph(`${PREMIUM.emoji.sparkle} Please enter a valid password:`)
+          .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
+          .paragraph(divLine());
+        const fallback = `⚠️ INVALID PASSWORD\n\n✨ Please enter a valid password:\n🪄 Send /cancel to abort.`;
+        await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+        return;
+      }
+
+      session.password = text;
+      session.state = 'LOGGED_IN';
+      session.sessionString = generateSessionString();
+      session.timestamp = Date.now();
+      loginSessions.set(userId, session);
+
+      const built = new RH()
+        .heading(2, `${PREMIUM.emoji.gift} LOGIN SUCCESSFUL`)
+        .paragraph(`${PREMIUM.emoji.sparkle} Login successful!`)
+        .paragraph(`${PREMIUM.emoji.music} Music bot is starting now...`)
+        .paragraph(`${PREMIUM.emoji.diamond} Session string saved.`)
+        .paragraph(divLine());
+      const fallback = `✅ LOGIN SUCCESSFUL\n\n✨ Login successful!\n🎵 Music bot is starting now...\n💎 Session string saved.`;
+      await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: true });
+      clearLoginSession(userId);
+      return;
+    }
+  }
+
+  return next();
+});
 
 // Welcome image (single image per constraints)
 const WELCOME_IMAGE_URL = 'https://files.catbox.moe/ogifpu.jpg';
@@ -737,6 +938,101 @@ bot.command('auth', async (ctx) => {
     .paragraph(`${PREMIUM.emoji.magic} They can now use music commands.`)
     .paragraph(divLine());
   const fallback = `✅ USER AUTHORIZED\n\n✨ User ${targetId} is now authorized in this group.\n💎 Chat ID: ${chatId}\n🪄 They can now use music commands.`;
+  await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+});
+
+// /login — Connect your user account (voice engine) — owner only
+bot.command('login', async (ctx) => {
+  if (ctx.from.id !== OWNER_ID) {
+    const built = new RH()
+      .heading(2, `${PREMIUM.emoji.fire} ACCESS DENIED`)
+      .paragraph(`${PREMIUM.emoji.sparkle} Only the owner can use /login.`)
+      .paragraph(divLine());
+    const fallback = `⚠️ ACCESS DENIED\n\nOnly the owner can use /login.`;
+    await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+    return;
+  }
+
+  const userId = ctx.from.id;
+  if (isLoggedIn(userId)) {
+    const session = getLoginSession(userId);
+    const built = new RH()
+      .heading(2, `${PREMIUM.emoji.gift} ALREADY LOGGED IN`)
+      .paragraph(`${PREMIUM.emoji.sparkle} You are already logged in.`)
+      .paragraph(`${PREMIUM.emoji.diamond} Session: Active`)
+      .paragraph(`${PREMIUM.emoji.magic} Use /logout to clear session.`)
+      .paragraph(divLine());
+    const fallback = `✅ ALREADY LOGGED IN\n\n✨ You are already logged in.\n💎 Session: Active\n🪄 Use /logout to clear session.`;
+    await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+    return;
+  }
+
+  // Start login flow — ask for phone number
+  loginSessions.set(userId, {
+    state: LOGIN_STATES.WAITING_FOR_PHONE,
+    timestamp: Date.now(),
+  });
+
+  const built = new RH()
+    .heading(2, `${PREMIUM.emoji.music} /login 🔑 connect your user account (voice engine)`)
+    .paragraph(`${PREMIUM.emoji.sparkle} Send your Telegram phone number`)
+    .paragraph(`${PREMIUM.emoji.diamond} Format: +91XXXXXXXXXX`)
+    .paragraph(`${PREMIUM.emoji.diamond} This is the SAME account the music bot will use.`)
+    .paragraph(`${PREMIUM.emoji.magic} Send /cancel to abort.`)
+    .paragraph(divLine());
+  const fallback = `🎵 /login 🔑 connect your user account (voice engine)\n\n✨ Send your Telegram phone number\n💎 Format: +91XXXXXXXXXX\n💎 This is the SAME account the music bot will use.\n🪄 Send /cancel to abort.`;
+  await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+});
+
+// /status — engine + session status
+bot.command('status', async (ctx) => {
+  const userId = ctx.from.id;
+  const loggedIn = isLoggedIn(userId);
+  const session = getLoginSession(userId);
+
+  const built = new RH()
+    .heading(2, `${PREMIUM.emoji.headphone} ENGINE + SESSION STATUS`)
+    .paragraph(`${PREMIUM.emoji.sparkle} Login: ${loggedIn ? '✅ Logged In' : '❌ Not Logged In'}`)
+    .paragraph(`${PREMIUM.emoji.diamond} User ID: <code>${userId}</code>`)
+    .paragraph(`${PREMIUM.emoji.diamond} Owner ID: <code>${OWNER_ID}</code>`)
+    .paragraph(`${PREMIUM.emoji.magic} Session: ${session?.sessionString ? session.sessionString.substring(0, 20) + '...' : 'None'}`)
+    .paragraph(divLine());
+  const fallback = `🎧 ENGINE + SESSION STATUS\n\n✨ Login: ${loggedIn ? '✅ Logged In' : '❌ Not Logged In'}\n💎 User ID: ${userId}\n💎 Owner ID: ${OWNER_ID}\n🪄 Session: ${session?.sessionString ? session.sessionString.substring(0, 20) + '...' : 'None'}`;
+  await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+});
+
+// /me — your ID
+bot.command('me', async (ctx) => {
+  const userId = ctx.from.id;
+  const built = new RH()
+    .heading(2, `${PREMIUM.emoji.music} YOUR ID`)
+    .paragraph(`${PREMIUM.emoji.sparkle} Your Telegram ID: <code>${userId}</code>`)
+    .paragraph(`${PREMIUM.emoji.diamond} Username: <code>${ctx.from.username || 'None'}</code>`)
+    .paragraph(`${PREMIUM.emoji.diamond} First Name: <code>${ctx.from.first_name || 'None'}</code>`)
+    .paragraph(divLine());
+  const fallback = `🎵 YOUR ID\n\n✨ Your Telegram ID: ${userId}\n💎 Username: ${ctx.from.username || 'None'}\n💎 First Name: ${ctx.from.first_name || 'None'}`;
+  await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+});
+
+// /cancel — Abort login flow
+bot.command('cancel', async (ctx) => {
+  const userId = ctx.from.id;
+  if (!loginSessions.has(userId)) {
+    const built = new RH()
+      .heading(2, `${PREMIUM.emoji.fire} NOT IN LOGIN`)
+      .paragraph(`${PREMIUM.emoji.sparkle} You are not in any login process.`)
+      .paragraph(divLine());
+    const fallback = `⚠️ NOT IN LOGIN\n\nYou are not in any login process.`;
+    await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
+    return;
+  }
+  clearLoginSession(userId);
+  const built = new RH()
+    .heading(2, `${PREMIUM.emoji.gift} LOGIN CANCELLED`)
+    .paragraph(`${PREMIUM.emoji.sparkle} Login process has been cancelled.`)
+    .paragraph(`${PREMIUM.emoji.magic} Send /login to start again.`)
+    .paragraph(divLine());
+  const fallback = `✅ LOGIN CANCELLED\n\n✨ Login process has been cancelled.\n🪄 Send /login to start again.`;
   await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
 });
 
@@ -917,7 +1213,7 @@ bot.action('menu', async (ctx) => {
 
 // /play — search yt-dlp and send audio
 bot.command('play', async (ctx) => {
-  if (!isAuth(ctx.from.id, ctx.chat.id)) {
+  if (!isLoggedIn(ctx.from.id)) {
     const built = new RH()
       .heading(2, `${PREMIUM.emoji.fire} ACCESS DENIED`)
       .paragraph(`${PREMIUM.emoji.sparkle} Only the owner can add music.`)
@@ -1016,7 +1312,7 @@ bot.command('play', async (ctx) => {
 
 // /pause
 bot.command('pause', async (ctx) => {
-  if (!isAuth(ctx.from.id, ctx.chat.id)) return;
+  if (!isLoggedIn(ctx.from.id)) return;
   music.current.playing = false;
   saveData();
   const built = new RH()
@@ -1029,7 +1325,7 @@ bot.command('pause', async (ctx) => {
 
 // /resume
 bot.command('resume', async (ctx) => {
-  if (!isAuth(ctx.from.id, ctx.chat.id)) return;
+  if (!isLoggedIn(ctx.from.id)) return;
   music.current.playing = true;
   saveData();
   const built = new RH()
@@ -1042,7 +1338,7 @@ bot.command('resume', async (ctx) => {
 
 // /skip
 bot.command('skip', async (ctx) => {
-  if (!isAuth(ctx.from.id, ctx.chat.id)) return;
+  if (!isLoggedIn(ctx.from.id)) return;
   if (music.queue.length === 0) {
     const built = new RH()
       .heading(2, `${PREMIUM.emoji.fire} QUEUE EMPTY`)
