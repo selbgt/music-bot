@@ -134,7 +134,7 @@ function runPythonHelper(args) {
   return new Promise((resolve, reject) => {
     const python = process.env.PYTHON_PATH || 'python3';
     const script = path.join(__dirname, 'login_helper.py');
-    execFile(python, [script, ...args], { timeout: 60000, encoding: 'utf8' }, (error, stdout, stderr) => {
+    execFile(python, [script, ...args], { timeout: 120000, encoding: 'utf8' }, (error, stdout, stderr) => {
       if (error) {
         reject({ error: error.message, stderr: stderr ? stderr.toString() : '' });
         return;
