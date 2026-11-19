@@ -19,7 +19,7 @@
     "yt-dlp": "required for YouTube/SoundCloud audio search & download"
   },
   "render": {
-    "buildCommand": "apt-get update && apt-get install -y ffmpeg && pip install yt-dlp pyrogram",
+    "buildCommand": "apt-get update && apt-get install -y ffmpeg && pip3 install yt-dlp pyrogram",
     "startCommand": "bash start.sh"
   }
 }
