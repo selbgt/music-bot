@@ -243,7 +243,7 @@ async function sendRichCard(ctx, chatId, built, fallbackHtml, extra = {}, opts =
     }
   };
 
-  const richExtra = { ...extra, ...(extra.reply_markup !== undefined ? {} : { reply_markup: INLINE_KEYBOARD }) };
+  const richExtra = { ...extra };
 
   if (tg.sendRichMessage) {
     const withEffect = await attempt('rich+effect', () =>
@@ -437,7 +437,7 @@ bot.start(async (ctx) => {
         `${PREMIUM.musicDot} Video Playing ▶️ /vplay <song> — Play video in voice chat\n\n` +
         `${brandWrap(BRAND_NAME)}`;
 
-      const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, { reply_markup: INLINE_KEYBOARD }, { celebration: true });
+      const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: true });
       if (msg && msg.message_id) {
         try {
           await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '💋' }] });
@@ -606,7 +606,7 @@ bot.command('menu', async (ctx) => {
       `• /nowplaying — Open player card\n\n` +
       `🌐 HTML Player: ${PUBLIC_URL}/player`;
 
-    const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, { reply_markup: INLINE_KEYBOARD }, { celebration: false });
+    const msg = await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
     try {
       await ctx.telegram.setMessageReaction({ chat_id: ctx.chat.id, message_id: msg.message_id, reaction: [{ type: 'emoji', emoji: '⌨️' }] });
     } catch (reErr) {
@@ -661,7 +661,7 @@ bot.action('help', async (ctx) => {
       `• /nowplaying — Open rich music player card\n` +
       `• /menu — Show this commands page\n\n` +
       `🤖 ${BRAND_NAME}`;
-    await sendRichCard(ctx, ctx.chat.id, built, fallback, { reply_markup: INLINE_KEYBOARD }, { celebration: false });
+    await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
   } catch (e) {
     log('warn', 'Help callback failed:', e && e.message ? e.message : e);
     try {
@@ -704,7 +704,7 @@ bot.action('menu', async (ctx) => {
       `• /nowplaying — Open rich music player card\n\n` +
       `🌐 HTML Player: ${PUBLIC_URL}/player\n\n` +
       `🤖 ${BRAND_NAME}`;
-    await sendRichCard(ctx, ctx.chat.id, built, fallback, { reply_markup: INLINE_KEYBOARD }, { celebration: false });
+    await sendRichCard(ctx, ctx.chat.id, built, fallback, {}, { celebration: false });
   } catch (e) {
     log('warn', 'Menu callback failed:', e && e.message ? e.message : e);
     try {
