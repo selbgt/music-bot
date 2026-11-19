@@ -3,6 +3,7 @@ downloads/
 *.log
 music_data.json
 music_data.json.tmp
+sessions.json
 node_modules/
 npm-debug.log*
 .DS_Store
