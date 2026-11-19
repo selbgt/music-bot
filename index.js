@@ -198,6 +198,114 @@ function spotifyWrapped(spotifyUrl) {
   });
 }
 
+// ───────────────── JioSaavn search (most active/matching song) ─────────────────
+function saavnSearch(query) {
+  return new Promise((resolve) => {
+    const encodedQuery = encodeURIComponent(query);
+    const url = `https://www.jiosaavn.com/api.php?__call=search.getResults&query=${encodedQuery}&p=1&n=5&_format=json&_marker=0`;
+
+    https.get(url, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          const results = json.results || [];
+          if (results.length === 0) return resolve(null);
+
+          // Take the most active / top matching song (first result)
+          const top = results[0];
+          resolve({
+            title: top.song || top.title || 'Unknown',
+            artist: top.primary_artists || top.singers || 'Unknown',
+            duration: top.duration || 'Unknown',
+            url: top.media_url || top.perma_url || '',
+            downloadUrl: top.media_url || '',
+            source: 'saavn',
+          });
+        } catch (e) {
+          log('warn', 'Saavn search parse failed:', e.message);
+          resolve(null);
+        }
+      });
+    }).on('error', (e) => {
+      log('warn', 'Saavn search error:', e.message);
+      resolve(null);
+    }).setTimeout(15000, () => {
+      resolve(null);
+    });
+  });
+}
+
+// ───────────────── Spotify search via musicfab ─────────────────
+function spotifySearch(query) {
+  return new Promise((resolve) => {
+    const postData = JSON.stringify({ url: `https://open.spotify.com/search/${encodeURIComponent(query)}` });
+    const options = {
+      hostname: 'musicfab.io',
+      port: 443,
+      path: '/api/spotify',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0',
+        'Content-Length': Buffer.byteLength(postData),
+      },
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          if (!json || (json.error && !json.title)) return resolve(null);
+          resolve({
+            title: json.title || json.song || json.name || 'Unknown',
+            artist: json.artist || json.artists || json.by || 'Unknown',
+            duration: json.duration || 'Unknown',
+            url: json.url || json.link || json.perma_url || '',
+            downloadUrl: json.download_url || json.media_url || '',
+            source: 'spotify',
+          });
+        } catch (e) {
+          resolve(null);
+        }
+      });
+    });
+
+    req.on('error', () => resolve(null));
+    req.setTimeout(15000, () => { req.destroy(); resolve(null); });
+    req.end(postData);
+  });
+}
+
+// ───────────────── Unified music search — Saavn → Spotify → YouTube ─────────────────
+async function musicSearch(query) {
+  // Try JioSaavn first (most active matching song)
+  const saavn = await saavnSearch(query);
+  if (saavn && saavn.title && saavn.title !== 'Unknown') {
+    log('success', `Saavn match: ${saavn.title} by ${saavn.artist}`);
+    return saavn;
+  }
+
+  // Try Spotify
+  const spotify = await spotifySearch(query);
+  if (spotify && spotify.title && spotify.title !== 'Unknown') {
+    log('success', `Spotify match: ${spotify.title} by ${spotify.artist}`);
+    return spotify;
+  }
+
+  // Fallback to YouTube via yt-dlp
+  const yt = ytdlSearch(query);
+  if (yt) {
+    log('success', `YouTube match: ${yt.title} by Unknown`);
+    return { ...yt, source: 'youtube', downloadUrl: yt.url };
+  }
+
+  return null;
+}
+
 // ───────────────── yt-dlp helpers ─────────────────
 function ytdlSearch(query) {
   try {
@@ -815,17 +923,22 @@ bot.command('play', async (ctx) => {
     filePath = result.file || '';
     await ctx.deleteMessage().catch(() => {});
   } else {
-    // Search query
+    // Search query — Saavn → Spotify → YouTube
     const status = await ctx.reply('🔍 Searching…');
-    const result = ytdlSearch(query);
+    const result = await musicSearch(query);
     if (!result) {
-      await ctx.editMessageText('❌ No results found.');
+      await ctx.editMessageText('❌ No results found on Spotify, Saavn, or YouTube.');
       return;
     }
     title = result.title;
+    artist = result.artist || 'Unknown';
     duration = result.duration;
-    url = result.url;
-    // Download the found URL
+    url = result.downloadUrl || result.url || query;
+
+    // Announce which source matched
+    await ctx.editMessageText(`🎵 Found on ${result.source}: ${title} by ${artist}`);
+
+    // Download the matched URL via yt-dlp
     const status2 = await ctx.reply('⬇️ Downloading audio…');
     const downloaded = ytdlDownload(url);
     if (downloaded) {
